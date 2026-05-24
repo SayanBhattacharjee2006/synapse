@@ -27,9 +27,15 @@ services:
       - "8000:8000"
     volumes:
       - ./backend:/app
+      - /app/.venv
     depends_on:
       db:
         condition: service_healthy
 
 volumes:
   postgres_data:
+
+
+#Never mount entire project folder without masking .venv
+#Windows .venv is incompatible with Linux containers
+#Always add /app/.venv as anonymous volume when mounting code
