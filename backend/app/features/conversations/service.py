@@ -1,0 +1,135 @@
+import uuid
+from app.core.config import settings
+from sqlalchemy import select, update
+from app.features.conversations.models import Conversation, Message
+from sqlalchemy.ext.asyncio import AsyncSession
+from app.features.conversations.schemas import ConversationUpdate, MessageCreate
+
+# Conversation Services 
+
+async def get_all_conversations(db: AsyncSession):
+
+    stmt = select(Conversation).where(
+        Conversation.user_id == settings.HARDCODED_USER_ID ,
+        Conversation.is_deleted == False)
+
+    conversations = (await db.scalars(stmt)).all()
+    return conversations
+
+async def get_conversation_by_id(db: AsyncSession, conversation_id: uuid.UUID):
+    stmt = select(Conversation).where(
+        Conversation.id == conversation_id,
+        Conversation.is_deleted == False
+    )
+
+    conversation = (await db.scalars(stmt)).one_or_none()
+
+    if conversation is None :
+        raise ValueError("Conversation not found")
+
+    return conversation
+
+async def create_conversations(db:AsyncSession):
+
+    new_id = uuid.uuid4()
+
+    conversation = Conversation(
+        id = new_id,
+        slug = str(new_id),
+        user_id = settings.HARDCODED_USER_ID,
+    )
+
+    db.add(conversation)
+    await db.commit()
+    await db.refresh(conversation)
+
+    return conversation
+
+async def update_conversations(db:AsyncSession, conversation_id: uuid.UUID, data: ConversationUpdate):
+    
+    stmt = select(Conversation).where(
+        Conversation.id == conversation_id, 
+        Conversation.is_deleted == False
+    )
+
+    conversation = (await db.scalars(stmt)).one_or_none()
+
+    if conversation is None :
+        raise ValueError("Conversation not found")
+    
+    for field, value in data.model_dump(exclude_unset=True).items():
+        setattr(conversation, field, value)
+
+    await db.commit()
+    await db.refresh(conversation)
+
+    return conversation
+
+async def delete_conversation(db: AsyncSession, conversation_id: uuid.UUID):
+
+    stmt = select(Conversation).where(
+        Conversation.id == conversation_id,
+        Conversation.is_deleted == False
+    )
+
+    conversation = (await db.scalars(stmt)).one_or_none()
+
+    if conversation is None :
+        raise ValueError("Conversation not found")
+
+    setattr(conversation, "is_deleted", True)
+
+    await db.execute(update(Message).where(Message.conversation_id == conversation_id).values(is_deleted=True))
+
+    await db.commit()
+    await db.refresh(conversation)
+
+    return conversation
+
+
+# Message Services 
+
+async def get_messages(db: AsyncSession, conversation_id: uuid.UUID):
+
+    stmt = select(Message).where(
+        Message.conversation_id == conversation_id,
+        Message.is_deleted == False
+    ).order_by(Message.created_at)
+
+    messages = (await db.scalars(stmt)).all()
+
+    return messages
+
+async def delete_message(db: AsyncSession, message_id: uuid.UUID, conversation_id: uuid.UUID):
+
+    stmt = select(Message).where(
+        Message.conversation_id == conversation_id,
+        Message.id == message_id,
+        Message.is_deleted == False
+    )
+
+    message = (await db.scalars(stmt)).one_or_none()
+
+    if message is None :
+        raise ValueError("Message not found")
+
+    setattr(message, "is_deleted", True)
+
+    await db.commit()
+    await db.refresh(message)
+
+    return message
+
+async def create_message(db: AsyncSession, conversation_id: uuid.UUID, data: MessageCreate):
+
+    message = Message(
+        content = data.content,
+        sender = data.sender,
+        conversation_id = conversation_id
+    )
+
+    db.add(message)
+    await db.commit()
+    await db.refresh(message)
+
+    return message

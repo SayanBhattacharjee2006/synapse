@@ -1,5 +1,6 @@
 from fastapi import FastAPI
 from app.features.health.router import router as health_router
+from app.features.conversations.router import router as conversation_router
 
 app = FastAPI(
     title = "synapse",
@@ -7,3 +8,4 @@ app = FastAPI(
 )
 
 app.include_router(health_router, prefix="/api/v1")
+app.include_router(conversation_router, prefix="/api/v1")
