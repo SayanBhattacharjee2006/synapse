@@ -27,6 +27,7 @@ class Settings(BaseSettings):
 
     # Hardcoded user for Version 1 (no auth yet)
     HARDCODED_USER_ID:str
+    TEST_DATABASE_URL:PostgresDsn
 
     model_config= SettingsConfigDict(
         env_file="../.env",
