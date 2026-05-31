@@ -1,5 +1,5 @@
 import { useState } from "react"
-import { useChatStore } from "../../stores/chatStore"
+import { useChatStore } from "../../stores/ChatStore"
 import Input from "../ui/Input"
 import Button from "../ui/Button"
 import Spinner from "../ui/Spinner"
@@ -23,7 +23,7 @@ export default function MessageInput() {
   }
 
   return (
-    <div className="shrink-0 border-t border-[var(--color-border)] bg-[var(--color-bg-secondary)] p-4">
+    <div className="shrink-0 border-t border-[var(--color-border)] bg-[var(--color-bg-primary)] p-4">
       <div className="w-full">
         {!activeConversationId && (
           <p className="mb-3 text-center text-sm text-[var(--color-text-muted)]">Select or create a conversation to start chatting</p>

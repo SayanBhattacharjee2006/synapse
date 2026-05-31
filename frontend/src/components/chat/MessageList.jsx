@@ -1,14 +1,24 @@
 import { useEffect, useRef } from "react"
-import { useChatStore } from "../../stores/chatStore"
+import { useChatStore } from "../../stores/ChatStore"
 import MessageBubble from "./MessageBubble"
+import HomeView from "../home/HomeView"
 
 export default function MessageList() {
-  const { messages, isStreaming, streamingMessage } = useChatStore()
+  const { messages, isStreaming, streamingMessage, activeConversationId } = useChatStore()
   const bottomRef = useRef(null)
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" })
   }, [messages, streamingMessage])
+
+  // Show home view when no conversation is selected
+  if (!activeConversationId) {
+    return (
+      <div className="flex-1 overflow-y-auto bg-[var(--color-bg-primary)] px-6 py-4">
+        <HomeView />
+      </div>
+    )
+  }
 
   return (
     <div className="flex-1 overflow-y-auto bg-[var(--color-bg-primary)] px-6 py-4">

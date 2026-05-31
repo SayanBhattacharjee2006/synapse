@@ -1,6 +1,7 @@
 import Sidebar from "../components/ui/Sidebar"
 import MessageList from "../components/chat/MessageList"
 import MessageInput from "../components/chat/MessageInput"
+import RightSidebar from "../components/ui/RightSidebar"
 
 export default function ChatPage() {
   return (
@@ -10,6 +11,7 @@ export default function ChatPage() {
         <MessageList />
         <MessageInput />
       </main>
+      <RightSidebar />
     </div>
   )
 }
