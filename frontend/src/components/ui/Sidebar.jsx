@@ -6,51 +6,7 @@ import Spinner from "../ui/Spinner";
 
 const THEME_STORAGE_KEY = "synapse-theme";
 
-function SunIcon() {
-    return (
-        <svg
-            aria-hidden="true"
-            viewBox="0 0 24 24"
-            className="h-4 w-4"
-            fill="none"
-        >
-            <circle
-                cx="12"
-                cy="12"
-                r="4"
-                stroke="currentColor"
-                strokeWidth="1.8"
-            />
-            <path
-                d="M12 2.75v2.5M12 18.75v2.5M21.25 12h-2.5M5.25 12h-2.5M18.54 5.46l-1.77 1.77M7.23 16.77l-1.77 1.77M18.54 18.54l-1.77-1.77M7.23 7.23 5.46 5.46"
-                stroke="currentColor"
-                strokeWidth="1.8"
-                strokeLinecap="round"
-            />
-        </svg>
-    );
-}
-
-function MoonIcon() {
-    return (
-        <svg
-            aria-hidden="true"
-            viewBox="0 0 24 24"
-            className="h-4 w-4"
-            fill="none"
-        >
-            <path
-                d="M20.25 14.38A7.78 7.78 0 0 1 9.62 3.75 8.25 8.25 0 1 0 20.25 14.38Z"
-                stroke="currentColor"
-                strokeWidth="1.8"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-            />
-        </svg>
-    );
-}
-
-export default function Sidebar() {
+export default function Sidebar({ isOpen, onClose }) {
     const {
         conversations,
         activeConversationId,
@@ -86,49 +42,79 @@ export default function Sidebar() {
         });
     };
 
+    const handleSelect = (id) => {
+        loadMessages(id);
+        onClose?.();
+    };
+
     return (
-        <aside className="flex h-screen w-[260px] min-w-[260px] shrink-0 flex-col border-r border-[var(--color-border)] bg-[var(--color-bg-secondary)]">
-            <div className="flex flex-col gap-4 border-b border-[var(--color-border)] p-4 pt-7">
-                <div className="flex items-center text-3xl font-semibold text-[var(--color-accent)]">
-                    Synapse
+        <aside
+            className={`flex h-screen w-[300px] min-w-[300px] shrink-0 flex-col border-r border-[var(--color-border)] bg-[var(--color-bg-secondary)] max-md:fixed max-md:inset-y-0 max-md:left-0 max-md:z-50 max-md:shadow-2xl max-md:transition-transform max-md:duration-300 max-md:ease-in-out ${
+                isOpen ? "max-md:translate-x-0" : "max-md:-translate-x-full"
+            }`}
+        >
+            <div className="flex flex-col gap-5 border-b border-[var(--color-border)] p-5">
+                <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2.5 text-2xl font-bold text-[var(--color-text-primary)]">
+                        <span aria-hidden="true" className="text-[var(--color-accent)]">⚡</span>
+                        <span>Synapse</span>
+                    </div>
+                    <button
+                        type="button"
+                        onClick={onClose}
+                        className="flex h-9 w-9 items-center justify-center rounded-xl text-[var(--color-text-secondary)] transition-colors hover:bg-[var(--color-bg-elevated)] hover:text-[var(--color-text-primary)] md:hidden"
+                        aria-label="Close sidebar"
+                    >
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                            <path d="M18 6L6 18M6 6l12 12" />
+                        </svg>
+                    </button>
                 </div>
                 <Button
                     onClick={createConversation}
-                    className="w-full"
+                    className="w-full rounded-xl"
                     disabled={isLoading}
                 >
-                    + New Chat
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                        <path d="M12 5v14M5 12h14" />
+                    </svg>
+                    <span>New Chat</span>
                 </Button>
             </div>
 
-            <div className="flex-1 space-y-1 overflow-y-auto p-2 pt-4">
-                {isLoading && conversations.length === 0 ? (
-                    <div className="mt-6 flex justify-center">
-                        <Spinner size="md" />
-                    </div>
-                ) : conversations.length === 0 ? (
-                    <p className="mt-6 text-center text-base text-[var(--color-text-muted)]">
-                        No conversations yet
-                    </p>
-                ) : (
-                    conversations.map((convo) => (
-                        <ConversationItem
-                            key={convo.id}
-                            conversation={convo}
-                            isActive={activeConversationId === convo.id}
-                            onSelect={(id) => loadMessages(id)}
-                            onDelete={deleteConversation}
-                            onRename={() => {}}
-                        />
-                    ))
-                )}
+            <div className="flex-1 overflow-y-auto p-4">
+                <p className="mb-3 px-4 text-[13px] font-semibold uppercase tracking-wider text-[var(--color-text-muted)]">
+                    Recent
+                </p>
+                <div className="space-y-1">
+                    {isLoading && conversations.length === 0 ? (
+                        <div className="mt-8 flex justify-center">
+                            <Spinner size="md" />
+                        </div>
+                    ) : conversations.length === 0 ? (
+                        <p className="mt-8 text-center text-base text-[var(--color-text-muted)]">
+                            No conversations yet
+                        </p>
+                    ) : (
+                        conversations.map((convo) => (
+                            <ConversationItem
+                                key={convo.id}
+                                conversation={convo}
+                                isActive={activeConversationId === convo.id}
+                                onSelect={handleSelect}
+                                onDelete={deleteConversation}
+                                onRename={() => {}}
+                            />
+                        ))
+                    )}
+                </div>
             </div>
 
-            <div className="border-t border-[var(--color-border)] p-4">
+            <div className="border-t border-[var(--color-border)] p-5">
                 <button
                     type="button"
                     onClick={toggleDarkMode}
-                    className="flex w-full items-center justify-between gap-3 rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-elevated)] px-3 py-2.5 text-left transition-colors duration-200 hover:border-[var(--color-accent)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--color-bg-secondary)]"
+                    className="flex h-11 w-11 items-center justify-center rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-elevated)] text-[var(--color-text-secondary)] transition-colors duration-200 hover:border-[var(--color-accent)] hover:text-[var(--color-accent)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--color-bg-secondary)]"
                     aria-label={
                         isDarkMode
                             ? "Switch to light mode"
@@ -140,12 +126,16 @@ export default function Sidebar() {
                             : "Switch to dark mode"
                     }
                 >
-                    <span className="text-sm font-medium text-[var(--color-text-secondary)]">
-                        {isDarkMode ? "Dark mode" : "Light mode"}
-                    </span>
-                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[var(--color-bg-secondary)] text-[var(--color-text-primary)]">
-                        {isDarkMode ? <SunIcon /> : <MoonIcon />}
-                    </span>
+                    {isDarkMode ? (
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+                        </svg>
+                    ) : (
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <circle cx="12" cy="12" r="5" />
+                            <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" />
+                        </svg>
+                    )}
                 </button>
             </div>
         </aside>

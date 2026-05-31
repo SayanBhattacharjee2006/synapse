@@ -15,17 +15,7 @@ export default function Input({
             placeholder={placeholder}
             aria-label={ariaLabel}
             disabled={disabled}
-            className={`min-h-12 w-full rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-elevated)] px-5 py-3 text-base leading-6 text-[var(--color-text-primary)] outline-none transition-colors duration-200 placeholder:text-[var(--color-text-muted)] focus:border-[var(--color-accent)] focus:ring-2 focus:ring-[var(--color-accent)]/20 disabled:cursor-not-allowed disabled:opacity-60 ${className}`}
+            className={`min-h-12 w-full rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-elevated)] px-5 py-3 text-base leading-7 text-[var(--color-text-primary)] outline-none transition-colors duration-200 placeholder:text-[var(--color-text-muted)] focus:border-[var(--color-accent)] focus:ring-2 focus:ring-[var(--color-accent)]/20 disabled:cursor-not-allowed disabled:opacity-60 ${className}`}
         />
     );
 }
-
-
-
-
-
-
-
-
-
-
