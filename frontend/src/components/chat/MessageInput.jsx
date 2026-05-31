@@ -23,12 +23,12 @@ export default function MessageInput() {
   }
 
   return (
-    <div className="border-t border-[var(--color-border)] px-6 py-5 lg:px-10">
-      <div className="mx-auto w-full max-w-4xl">
+    <div className="shrink-0 border-t border-[var(--color-border)] bg-[var(--color-bg-secondary)] p-4">
+      <div className="w-full">
         {!activeConversationId && (
           <p className="mb-3 text-center text-sm text-[var(--color-text-muted)]">Select or create a conversation to start chatting</p>
         )}
-        <div className="flex items-center gap-3">
+        <div className="flex min-h-12 w-full items-center gap-3">
           <Input
             value={input}
             onChange={(e) => setInput(e.target.value)}
@@ -36,8 +36,13 @@ export default function MessageInput() {
             placeholder={isStreaming ? "AI is responding..." : "Type a message..."}
             aria-label="Message"
             disabled={isStreaming || !activeConversationId}
+            className="min-w-0 flex-1"
           />
-          <Button onClick={handleSend} disabled={isStreaming || !input.trim() || !activeConversationId}>
+          <Button
+            onClick={handleSend}
+            disabled={isStreaming || !input.trim() || !activeConversationId}
+            className="h-12 min-w-[88px] shrink-0 px-5"
+          >
             {isStreaming ? <Spinner size="sm" /> : "Send"}
           </Button>
         </div>

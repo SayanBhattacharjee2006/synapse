@@ -4,9 +4,9 @@ import MessageInput from "../components/chat/MessageInput"
 
 export default function ChatPage() {
   return (
-    <div className="flex h-screen min-h-screen bg-[var(--color-bg-primary)] text-base">
+    <div className="flex h-screen min-h-screen overflow-hidden bg-[var(--color-bg-primary)] text-[var(--color-text-primary)]">
       <Sidebar />
-      <main className="flex min-w-0 flex-1 flex-col overflow-hidden">
+      <main className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-[var(--color-bg-primary)]">
         <MessageList />
         <MessageInput />
       </main>

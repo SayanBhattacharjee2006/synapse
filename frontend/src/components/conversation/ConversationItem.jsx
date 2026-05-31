@@ -10,13 +10,13 @@ export default function ConversationItem({
     return (
         <div
             onClick={() => onSelect(conversation.id)}
-            className={`group flex min-h-12 cursor-pointer items-center justify-between gap-3 rounded-xl px-4 py-3 transition-colors duration-200 ${
+            className={`group flex min-h-11 w-full cursor-pointer items-center justify-between gap-2 rounded-lg px-3 py-2 transition-colors duration-200 ${
                 isActive
                     ? "bg-[var(--color-bg-elevated)]"
                     : "hover:bg-[var(--color-bg-elevated)]"
             }`}
         >
-            <span className="min-w-0 flex-1 truncate text-base text-[var(--color-text-primary)]">
+            <span className="min-w-0 flex-1 truncate text-sm text-[var(--color-text-primary)]">
                 {conversation.title || "New Chat"}
             </span>
             <div className="hidden shrink-0 items-center gap-1 group-hover:flex group-focus-within:flex">

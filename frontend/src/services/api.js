@@ -61,7 +61,7 @@ export const streamChat = async (
     onDone,
     onError,
 ) => {
-    await fetchEventSource(`/conversations/${conversationId}/chat`,{
+    await fetchEventSource(`http://localhost:8000/api/v1/conversations/${conversationId}/chat`,{
         method: "POST",
         body: JSON.stringify(data),
         headers: { "Content-Type": "application/json" },
@@ -75,6 +75,7 @@ export const streamChat = async (
         },
         onerror(err) {
             onError(err);
+            throw err;
         }
     });
 };

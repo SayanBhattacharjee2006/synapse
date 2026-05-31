@@ -11,13 +11,13 @@ export default function MessageList() {
   }, [messages, streamingMessage])
 
   return (
-    <div className="flex-1 overflow-y-auto px-6 py-8 lg:px-10">
+    <div className="flex-1 overflow-y-auto bg-[var(--color-bg-primary)] px-6 py-4">
       {messages.length === 0 && !isStreaming ? (
-        <div className="flex h-full items-center justify-center">
-          <p className="text-lg text-[var(--color-text-muted)]">Send a message to start the conversation</p>
+        <div className="flex min-h-full w-full items-center justify-center">
+          <p className="text-center text-base text-[var(--color-text-muted)]">Send a message to start the conversation</p>
         </div>
       ) : (
-        <div className="mx-auto w-full max-w-4xl">
+        <div className="flex w-full flex-col gap-4 pb-4">
           {messages.map((msg) => (
             <MessageBubble key={msg.id} message={msg} />
           ))}
