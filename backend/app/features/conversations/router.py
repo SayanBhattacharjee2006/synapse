@@ -51,16 +51,3 @@ async def message_delete(conversation_id: uuid.UUID, message_id: uuid.UUID, db: 
         return await service.delete_message(db, message_id, conversation_id)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
-
-
-
-
-
-
-
-
-
-
-# GET    /{conversation_id}/messages
-# POST   /{conversation_id}/messages
-# DELETE /{conversation_id}/messages/{message_id}

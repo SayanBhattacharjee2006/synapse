@@ -3,7 +3,7 @@ import uuid
 from app.core.database import Base
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.dialects.postgresql import UUID
-from sqlalchemy import func, ForeignKey, Enum
+from sqlalchemy import Text, func, ForeignKey, Enum
 from datetime import datetime 
 
 
@@ -21,9 +21,12 @@ class Conversation(Base):
     user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True))
     slug: Mapped[str]
     title: Mapped[str | None]
+    summary: Mapped[str | None] = mapped_column(Text, nullable=True)
+    last_summarised_message_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("messages.id"))
     is_deleted: Mapped[bool] = mapped_column("isDeleted",default=False)
     created_at: Mapped[datetime] = mapped_column("createdAt",server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column("updatedAt",server_default=func.now(), onupdate=func.now())
+
 
     messages: Mapped[list["Message"]] = relationship(back_populates="conversation")
 
