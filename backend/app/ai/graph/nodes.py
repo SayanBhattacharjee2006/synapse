@@ -5,7 +5,7 @@ from langchain_core.messages.utils import count_tokens_approximately
 from app.ai.llm import llm
 
 async def llm_node(state:GraphState) -> dict:
-    messages = [SystemMessage(content=get_system_prompt(state['summary']))] + state['messages']
+    messages = [SystemMessage(content=get_system_prompt(state.get("summary", "")))] + state['messages']
     res = await llm.ainvoke(messages)
     return {
         "messages" : [res],
@@ -14,17 +14,18 @@ async def llm_node(state:GraphState) -> dict:
 
 async def summarisation_node(state: GraphState) -> dict:
     tokensCount = count_tokens_approximately(state['messages'])
+    print(tokensCount)
     if tokensCount < 2500:
         return {}
     else:
-        if state["last_summarised_msg_id"] is None:
+        if state.get("last_summarised_msg_id","") is None:
             last_summarised_msg_idx = 0
         else:
             last_summarised_msg_idx = next(
                 (
                     idx
                     for idx, msg in enumerate(state["messages"])
-                    if msg.id == state["last_summarised_msg_id"]
+                    if msg.id == state.get("last_summarised_msg_id","")
                 ),
                 None,
             )
@@ -37,8 +38,9 @@ async def summarisation_node(state: GraphState) -> dict:
         if not messges_to_summarise:
             return {}
 
-        summary_respone = await llm.ainvoke([SystemMessage(content=get_summariser_prompt(state['summary'], messges_to_summarise))])
+        summary_respone = await llm.ainvoke([SystemMessage(content=get_summariser_prompt(state.get("summary", ""), messges_to_summarise))])
         messages_to_remove = state["messages"][:-10]
+        print("summary",summary_respone.content)
         return {
             "summary": summary_respone.content,
             "last_summarised_msg_id": messges_to_summarise[-1].id,

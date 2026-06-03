@@ -33,9 +33,12 @@ async def stream_chat(
     yield "data: [DONE]\n\n"
 
     final_graph_state = await graph.aget_state(config)
+    print(final_graph_state.values)
+    print("latest_summarised_msg_id",final_graph_state.values.get("last_summarised_msg_id"))
+    print("summary",final_graph_state.values.get("summary"))
+    print(len(final_graph_state.values["messages"]))
     update_values = {
         "summary": final_graph_state.values.get("summary"),
-        "last_summarised_msg_id": final_graph_state.values.get("last_summarised_msg_id"),
     }
 
     if is_first_message:
