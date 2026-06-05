@@ -1,4 +1,4 @@
-import { Card, Button } from "@/components/ui";
+import { Button } from "@/components/ui";
 
 import { Moon, PanelLeft, Sun } from "lucide-react";
 
@@ -11,37 +11,34 @@ export default function ChatHeader({
   const { theme, toggleTheme } = useThemeStore();
 
   return (
-    <Card className="flex items-center justify-between border-0 p-4 z-10">
-      
-      <div className="flex items-center gap-3">
-        
-        {/* Mobile Sidebar Toggle */}
+    <header className="z-10 flex shrink-0 items-center justify-between border-b-2 border-[var(--color-border)] bg-[var(--color-background)] py-4 pl-[calc(1.25rem_+_var(--safe-area-left))] pr-[calc(1.5rem_+_var(--safe-area-right))]">
+      <div className="flex min-w-0 items-center gap-3">
         <Button
           variant="secondary"
           size="icon"
-          className="md:hidden"
+          className="shrink-0 md:hidden"
           onClick={onOpenSidebar}
           aria-label="Open sidebar"
         >
           <PanelLeft size={18} />
         </Button>
 
-        <div className="pl-6">
-          <h1 className="text-3xl font-black uppercase ">
+        <div className="min-w-0">
+          <h1 className="truncate font-[var(--font-display)] text-3xl font-black uppercase tracking-[-0.08em]">
             {title}
           </h1>
 
-          <p className="text-sm uppercase text-[var(--color-muted)]">
+          <p className="font-[var(--font-body)] text-xs uppercase tracking-widest text-[var(--color-muted)]">
             Synapse AI Assistant
           </p>
         </div>
       </div>
 
-      {/* Actions */}
       <div className="flex items-center gap-2">
         <Button
           variant="secondary"
           size="icon"
+          className="shrink-0"
           onClick={toggleTheme}
           aria-label={
             theme === "dark"
@@ -57,6 +54,6 @@ export default function ChatHeader({
           )}
         </Button>
       </div>
-    </Card>
+    </header>
   );
 }

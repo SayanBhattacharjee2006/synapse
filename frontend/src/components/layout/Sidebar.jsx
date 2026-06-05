@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 
 import { Button, Card } from "@/components/ui";
 
@@ -14,8 +15,11 @@ import { useThemeStore } from "@/stores/themeStore";
 
 export default function Sidebar({
   className,
+  isOpen = false,
   onClose,
 }) {
+  const navigate = useNavigate();
+
   const {
     conversations,
     activeConversationId,
@@ -28,25 +32,30 @@ export default function Sidebar({
 
   useEffect(() => {
     loadConversations();
-  }, []);
+  }, [loadConversations]);
 
   const handleCreateConversation = async () => {
     const conversation = await createConversation();
 
     if (conversation) {
+      navigate(`/chat/${conversation.id}`);
       onClose?.();
     }
   };
 
   const handleSelectConversation = (conversationId) => {
     setActiveConversationId(conversationId);
+    navigate(`/chat/${conversationId}`);
     onClose?.();
   };
 
   return (
     <aside
       className={cn(
-        "fixed inset-y-0 left-0 z-50 flex h-screen w-[320px] flex-col gap-4 border-r-2 border-[var(--color-border)] bg-[var(--color-background)] p-4 transition-transform duration-200 md:static md:z-auto md:transition-none",
+        "fixed left-0 top-0 z-50 flex h-[var(--app-height)] max-h-[var(--app-height)] w-full flex-col gap-4 border-r-2 border-[var(--color-border)] bg-[var(--color-background)] p-4 pb-[calc(1rem_+_var(--safe-area-bottom))] transition-transform duration-200 md:static md:z-auto md:w-[320px] md:transition-none",
+        isOpen
+          ? "translate-x-0"
+          : "-translate-x-full md:translate-x-0",
         className
       )}
     >

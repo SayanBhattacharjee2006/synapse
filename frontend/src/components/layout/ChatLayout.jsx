@@ -6,7 +6,7 @@ export default function ChatLayout({
   onCloseSidebar,
 }) {
   return (
-    <div className="relative flex h-screen overflow-hidden bg-[var(--color-background)] text-[var(--color-foreground)]">
+    <div className="relative flex h-[var(--app-height)] overflow-hidden bg-[var(--color-background)] text-[var(--color-foreground)]">
       
       {/* Mobile Overlay */}
       {sidebarOpen && (

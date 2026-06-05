@@ -1,12 +1,16 @@
 import { useEffect } from "react";
 
+import { useParams } from "react-router-dom";
+
 import { useChatStore } from "@/features/chat/store/ChatStore";
 
 import { useConversationStore } from "@/features/conversations/store/ConversationStore";
 
 export function useChat() {
+  const { conversationId } = useParams();
+
   const {
-    activeConversationId,
+    setActiveConversationId,
   } = useConversationStore();
 
   const {
@@ -18,22 +22,30 @@ export function useChat() {
   } = useChatStore();
 
   useEffect(() => {
-    if (!activeConversationId) {
+    if (!conversationId) {
       return;
     }
 
-    loadMessages(activeConversationId);
-  }, [activeConversationId]);
+    setActiveConversationId(
+      conversationId
+    );
+
+    loadMessages(conversationId);
+  }, [
+    conversationId,
+    loadMessages,
+    setActiveConversationId,
+  ]);
 
   const handleSendMessage = async (
     content
   ) => {
-    if (!activeConversationId) {
+    if (!conversationId) {
       return;
     }
 
     await sendMessage(
-      activeConversationId,
+      conversationId,
       {
         content,
         sender: "user",
@@ -43,10 +55,13 @@ export function useChat() {
 
   return {
     messages,
+
     streamingMessage,
+
     isStreaming,
 
-    activeConversationId,
+    activeConversationId:
+      conversationId,
 
     handleSendMessage,
   };

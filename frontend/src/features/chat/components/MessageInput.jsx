@@ -27,9 +27,8 @@ export default function MessageInput({
   };
 
   return (
-    <div className="border-t-2 border-[var(--color-border)] bg-[var(--color-background)] p-6">
+    <div className="shrink-0 border-t-2 border-[var(--color-border)] bg-[var(--color-background)] p-4 pb-[calc(1rem_+_var(--safe-area-bottom))] sm:p-6 sm:pb-[calc(1.5rem_+_var(--safe-area-bottom))]">
       <div className="flex items-center gap-3">
-        
         <Input
           className="min-w-0 flex-1"
           value={message}
@@ -48,7 +47,7 @@ export default function MessageInput({
           className="shrink-0 gap-2 p-6"
         >
           <Send size={18} />
-          <span className="uppercase">Send</span>
+          <span className="uppercase hidden md:inline">Send</span>
         </Button>
       </div>
     </div>
