@@ -1,102 +1,106 @@
+@import url("https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;700&display=swap");
 @import "tailwindcss";
-
 @custom-variant dark (&:where(.dark, .dark *));
 
 @theme {
-  /* COLORS */
-  --color-background: #ffffff;
-  --color-surface: #f3f3f3;
-  --color-foreground: #000000;
-  --color-primary: #ffe600;
-  --color-border: #000000;
-  --color-muted: #6b7280;
-  --color-danger: #ff4d4f;
+    /* COLORS */
+    --color-background: #f9f9f9;
+    --color-surface: #f3f3f3;
+    --color-foreground: #000000;
+    --color-primary: #ffe600;
+    --color-border: #000000;
+    --color-muted: #6b7280;
+    --color-danger: #ff4d4f;
+    --color-convo: #f5f5f5;
+    --color-msg: #ffffff;
+    /* TYPOGRAPHY */
+    --font-display: "Space Grotesk", sans-serif;
+    --font-body: "IBM Plex Mono", monospace;
 
-  /* TYPOGRAPHY */
-  --font-display: "Space Grotesk", sans-serif;
-  --font-body: "Inter", sans-serif;
+    /* SHADOWS */
+    --shadow-brutal-sm: 2px 2px 0px 0px var(--color-border);
+    --shadow-brutal-md: 4px 4px 0px 0px var(--color-border);
+    --shadow-brutal-lg: 6px 6px 0px 0px var(--color-border);
 
-  /* SHADOWS */
-  --shadow-brutal-sm: 2px 2px 0px 0px var(--color-border);
-  --shadow-brutal-md: 4px 4px 0px 0px var(--color-border);
-  --shadow-brutal-lg: 6px 6px 0px 0px var(--color-border);
+    /* BORDERS */
+    --border-width-brutal: 2px;
 
-  /* BORDERS */
-  --border-width-brutal: 2px;
+    /* LAYOUT */
+    --sidebar-width: 280px;
+    --header-height: 64px;
 
-  /* LAYOUT */
-  --sidebar-width: 280px;
-  --header-height: 64px;
-
-  /* RADIUS */
-  --radius-brutal: 0px;
+    /* RADIUS */
+    --radius-brutal: 0px;
 }
 
 :root {
-  color-scheme: light;
+    color-scheme: light;
 
-  --color-background: #ffffff;
-  --color-surface: #f3f3f3;
-  --color-foreground: #000000;
-  --color-primary: #ffe600;
-  --color-border: #000000;
-  --color-muted: #6b7280;
-  --color-danger: #ff4d4f;
+    --color-background: #ffffff;
+    --color-surface: #f3f3f3;
+    --color-foreground: #000000;
+    --color-primary: #ffe600;
+    --color-border: #000000;
+    --color-muted: #6b7280;
+    --color-danger: #ff4d4f;
 }
 
 html.dark {
-  color-scheme: dark;
+    color-scheme: dark;
 
-  --color-background: #000000;
-  --color-surface: #111111;
-  --color-foreground: #ffffff;
-  --color-primary: #ffe600;
-  --color-border: #ffffff;
-  --color-muted: #9ca3af;
-  --color-danger: #ff4d4f;
+    --color-background: #000000;
+    --color-surface: #111111;
+    --color-foreground: #ffffff;
+    --color-primary: #ffe600;
+    --color-border: #ffffff;
+    --color-muted: #9ca3af;
+    --color-danger: #ff4d4f;
+    --color-convo: #000000;
+    --color-msg: #000000;
 }
 
 * {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
+    margin: 0;
+    box-sizing: border-box;
 }
 
 html,
 body,
 #root {
-  width: 100%;
-  height: 100%;
-  min-height: 100%;
+    width: 100%;
+    height: 100%;
+    min-height: 100%;
 }
 
 body {
-  background-color: var(--color-background);
-  color: var(--color-foreground);
+    background-color: var(--color-background);
+    color: var(--color-foreground);
 
-  font-family: var(--font-body);
-  font-size: 16px;
-  line-height: 1.5;
+    font-family: var(--font-body);
+    font-weight: 500;
+    letter-spacing: -0.02em;
+    font-size: 17px;
+    line-height: 1.5;
 
-  overflow: hidden;
+    overflow: hidden;
 
-  text-rendering: optimizeLegibility;
-  -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
 }
 
-button,
-input,
-textarea {
-  font: inherit;
-}
+@layer base {
+    button,
+    input,
+    textarea {
+        font: inherit;
+    }
 
-button {
-  cursor: pointer;
-  border: none;
-  background: none;
+    button {
+        cursor: pointer;
+    }
 }
 
 ::selection {
-  background: var(--color-primary);
-  color: var(--color-foreground);
+    background: var(--color-primary);
+    color: var(--color-foreground);
 }

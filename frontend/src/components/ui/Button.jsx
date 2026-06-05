@@ -8,13 +8,13 @@ export default function Button({
   disabled = false,
   className,
   ...props
-}) {
+}) { 
   const base =
     "inline-flex items-center justify-center border-2 border-[var(--color-border)] font-bold uppercase transition-all duration-150 active:translate-x-[4px] active:translate-y-[4px] disabled:opacity-50 disabled:pointer-events-none";
 
   const variants = {
     primary:
-      "bg-[var(--color-primary)] text-[var(--color-foreground)] shadow-[4px_4px_0px_var(--color-border)] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-none",
+      "border-black bg-[var(--color-primary)] font-extrabold text-black shadow-[4px_4px_0px_black] dark:shadow-[4px_4px_0px_white] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-none",
 
     secondary:
       "bg-[var(--color-background)] text-[var(--color-foreground)] shadow-[4px_4px_0px_var(--color-border)] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-none",
@@ -24,9 +24,9 @@ export default function Button({
   };
 
   const sizes = {
-    sm: "h-10 px-4 text-sm",
-    md: "h-12 px-6 text-sm",
-    lg: "h-14 px-8 text-base",
+    sm: "h-10 px-4 text-base",
+    md: "h-12 px-6 text-base",
+    lg: "h-14 px-8 text-lg",
     icon: "h-12 w-12",
   };
 

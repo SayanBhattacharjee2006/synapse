@@ -7,7 +7,7 @@ export default function ChatPage() {
   const [sidebarOpen, setSidebarOpen] = useState(false)
 
   return (
-    <div className="relative flex h-screen min-h-screen overflow-hidden bg-[var(--color-bg-primary)] text-[var(--color-text-primary)]">
+    <div className="relative flex h-screen min-h-screen overflow-hidden bg-[var(--color-bg-primary)] text-[var(--color-text-primary)] ">
       {/* Mobile overlay backdrop */}
       {sidebarOpen && (
         <div
@@ -30,7 +30,7 @@ export default function ChatPage() {
               <path d="M4 6h16M4 12h16M4 18h16" />
             </svg>
           </button>
-          <span className="text-lg font-semibold text-[var(--color-text-primary)]">Synapse</span>
+          <span className="text-xl font-semibold text-[var(--color-text-primary)]">Synapse</span>
         </div>
 
         <MessageList />

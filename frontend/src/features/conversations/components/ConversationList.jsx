@@ -8,7 +8,7 @@ export default function ConversationList({
   if (conversations.length === 0) {
     return (
       <div className="flex h-full items-center justify-center">
-        <p className="text-sm font-bold uppercase text-[var(--color-muted)]">
+        <p className="text-base font-bold uppercase text-[var(--color-muted)]">
           No conversations
         </p>
       </div>
@@ -20,7 +20,10 @@ export default function ConversationList({
       {conversations.map((conversation) => (
         <ConversationItem
           key={conversation.id}
-          title={conversation.title}
+          title={
+            conversation.title?.trim() ||
+            "New Chat"
+          }
           updatedAt={conversation.updatedAt}
           active={conversation.id === activeConversationId}
           onClick={() =>

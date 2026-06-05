@@ -15,14 +15,14 @@ export default function MessageBubble({
     >
       <div
         className={cn(
-          "max-w-[80%] border-2 border-[var(--color-border)] px-4 py-3 shadow-[4px_4px_0px_var(--color-border)]",
+          "max-w-[80%] border-2 border-[var(--color-border)] px-6 py-4 shadow-[4px_4px_0px_var(--color-border)]",
 
           isUser
-            ? "bg-[var(--color-primary)] text-[var(--color-foreground)]"
-            : "bg-[var(--color-background)] text-[var(--color-foreground)]"
+            ? "border-black bg-[var(--color-primary)] font-extrabold text-black shadow-[4px_4px_0px_black] dark:shadow-[4px_4px_0px_white]"
+            : "border-black bg-[#F5F5F5] font-extrabold text-black shadow-[6px_6px_0px_var(--color-primary)]"
         )}
       >
-        <p className="whitespace-pre-wrap break-words text-sm font-medium">
+        <p className="whitespace-pre-wrap break-words text-base font-extrabold">
           {content}
         </p>
       </div>

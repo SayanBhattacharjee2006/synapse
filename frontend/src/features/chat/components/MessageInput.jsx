@@ -27,10 +27,11 @@ export default function MessageInput({
   };
 
   return (
-    <div className="border-t-2 border-[var(--color-border)] bg-[var(--color-background)] p-4">
+    <div className="border-t-2 border-[var(--color-border)] bg-[var(--color-background)] p-6">
       <div className="flex items-center gap-3">
         
         <Input
+          className="min-w-0 flex-1"
           value={message}
           onChange={(event) =>
             setMessage(event.target.value)
@@ -41,11 +42,13 @@ export default function MessageInput({
         />
 
         <Button
-          size="icon"
+          size="md"
           onClick={handleSendMessage}
           disabled={!message.trim() || isStreaming}
+          className="shrink-0 gap-2 p-6"
         >
           <Send size={18} />
+          <span className="uppercase">Send</span>
         </Button>
       </div>
     </div>

@@ -1,3 +1,5 @@
+import { useState } from "react";
+
 import { ChatLayout } from "@/components/layout";
 
 import {
@@ -8,7 +10,15 @@ import {
 
 import { useChat } from "@/features/chat/hooks/useChat";
 
+import { useConversationStore } from "@/features/conversations/store/ConversationStore";
+
 export default function App() {
+  const [sidebarOpen, setSidebarOpen] =
+    useState(false);
+
+  const { conversations, activeConversationId } =
+    useConversationStore();
+
   const {
     messages,
     streamingMessage,
@@ -16,11 +26,28 @@ export default function App() {
     handleSendMessage,
   } = useChat();
 
+  const activeConversation = conversations.find(
+    (conversation) =>
+      conversation.id === activeConversationId
+  );
+
+  const headerTitle =
+    activeConversationId && activeConversation
+      ? activeConversation.title?.trim() ||
+        "New Chat"
+      : "Synapse";
+
   return (
-    <ChatLayout>
+    <ChatLayout
+      sidebarOpen={sidebarOpen}
+      onCloseSidebar={() => setSidebarOpen(false)}
+    >
       <div className="flex h-full flex-col">
         
-        <ChatHeader title="Synapse" />
+        <ChatHeader
+          title={headerTitle}
+          onOpenSidebar={() => setSidebarOpen(true)}
+        />
 
         {/* Messages */}
         <div className="flex-1 overflow-y-auto">

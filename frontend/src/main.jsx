@@ -10,12 +10,20 @@ function applyInitialTheme() {
 
   try {
     const savedTheme = localStorage.getItem(THEME_STORAGE_KEY)
-    const theme = savedTheme === "light" ? "light" : "dark"
+    const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches
+    const theme =
+      savedTheme === "light" || savedTheme === "dark"
+        ? savedTheme
+        : prefersDark
+          ? "dark"
+          : "light"
 
+    root.classList.toggle("light", theme === "light")
     root.classList.toggle("dark", theme === "dark")
     localStorage.setItem(THEME_STORAGE_KEY, theme)
   } catch {
-    root.classList.add("dark")
+    root.classList.remove("dark")
+    root.classList.add("light")
   }
 }
 

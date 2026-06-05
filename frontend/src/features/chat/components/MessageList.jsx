@@ -6,7 +6,7 @@ export default function MessageList({
   if (messages.length === 0) {
     return (
       <div className="flex h-full items-center justify-center">
-        <p className="text-sm font-bold uppercase text-[var(--color-muted)]">
+        <p className="text-base font-bold uppercase text-[var(--color-muted)]">
           Start a conversation
         </p>
       </div>
@@ -14,7 +14,7 @@ export default function MessageList({
   }
 
   return (
-    <div className="flex flex-col gap-4 p-6">
+    <div className="flex flex-col gap-6 p-8">
       {messages.map((message) => (
         <MessageBubble
           key={message.id}

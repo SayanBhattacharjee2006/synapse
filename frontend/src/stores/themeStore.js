@@ -23,6 +23,10 @@ export const useThemeStore = create((set, get) => ({
       "dark",
       theme === "dark"
     );
+    document.documentElement.classList.toggle(
+      "light",
+      theme === "light"
+    );
 
     set({ theme });
   },
