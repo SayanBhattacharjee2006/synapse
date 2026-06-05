@@ -1,141 +1,128 @@
 import { create } from "zustand";
 
 import {
-  getConversations,
-  createConversations,
-  updateConversations,
-  deleteConversations,
+    getConversations,
+    createConversations,
+    updateConversations,
+    deleteConversations,
 } from "@/services/api";
 
 export const useConversationStore = create((set) => ({
-  conversations: [],
-  activeConversationId: null,
+    conversations: [],
+    activeConversationId: null,
 
-  isLoading: false,
-  error: null,
+    isLoading: false,
+    error: null,
 
-  setActiveConversationId: (conversationId) => {
-    set({
-      activeConversationId: conversationId,
-    });
-  },
+    setActiveConversationId: (conversationId) => {
+        set({
+            activeConversationId: conversationId,
+        });
+    },
 
-  loadConversations: async () => {
-    try {
-      set({
-        isLoading: true,
-        error: null,
-      });
+    loadConversations: async () => {
+        try {
+            set({
+                isLoading: true,
+                error: null,
+            });
 
-      const response = await getConversations();
+            const response = await getConversations();
 
-      set({
-        conversations: response.data,
-        isLoading: false,
-        error: null,
-      });
-    } catch (error) {
-      set({
-        isLoading: false,
-        error: error.message,
-      });
-    }
-  },
+            set({
+                conversations: response.data,
+                isLoading: false,
+                error: null,
+            });
+        } catch (error) {
+            set({
+                isLoading: false,
+                error: error.message,
+            });
+        }
+    },
 
-  createConversation: async () => {
-    try {
-      set({
-        isLoading: true,
-        error: null,
-      });
+    createConversation: async () => {
+        try {
+            set({
+                isLoading: true,
+                error: null,
+            });
 
-      const response = await createConversations();
+            const response = await createConversations();
 
-      set((state) => ({
-        conversations: [
-          response.data,
-          ...state.conversations,
-        ],
+            set((state) => ({
+                conversations: [response.data, ...state.conversations],
 
-        activeConversationId: response.data.id,
+                activeConversationId: response.data.id,
 
-        isLoading: false,
-        error: null,
-      }));
+                isLoading: false,
+                error: null,
+            }));
 
-      return response.data;
-    } catch (error) {
-      set({
-        isLoading: false,
-        error: error.message,
-      });
-    }
-  },
+            return response.data;
+        } catch (error) {
+            set({
+                isLoading: false,
+                error: error.message,
+            });
+        }
+    },
 
-  updateConversation: async (
-    conversationId,
-    data
-  ) => {
-    try {
-      set({
-        isLoading: true,
-        error: null,
-      });
+    updateConversation: async (conversationId, data) => {
+        try {
+            set({
+                isLoading: true,
+                error: null,
+            });
 
-      const response = await updateConversations(
-        conversationId,
-        data
-      );
+            const response = await updateConversations(conversationId, data);
 
-      set((state) => ({
-        conversations: state.conversations.map(
-          (conversation) =>
-            conversation.id === conversationId
-              ? response.data
-              : conversation
-        ),
+            set((state) => ({
+                conversations: state.conversations.map((conversation) =>
+                    conversation.id === conversationId
+                        ? response.data
+                        : conversation,
+                ),
 
-        isLoading: false,
-        error: null,
-      }));
-    } catch (error) {
-      set({
-        isLoading: false,
-        error: error.message,
-      });
-    }
-  },
+                isLoading: false,
+                error: null,
+            }));
+        } catch (error) {
+            set({
+                isLoading: false,
+                error: error.message,
+            });
+        }
+    },
 
-  deleteConversation: async (conversationId) => {
-    try {
-      set({
-        isLoading: true,
-        error: null,
-      });
+    deleteConversation: async (conversationId) => {
+        try {
+            set({
+                isLoading: true,
+                error: null,
+            });
 
-      await deleteConversations(conversationId);
+            await deleteConversations(conversationId);
 
-      set((state) => ({
-        conversations:
-          state.conversations.filter(
-            (conversation) =>
-              conversation.id !== conversationId
-          ),
+            set((state) => ({
+                conversations: state.conversations.filter(
+                    (conversation) => conversation.id !== conversationId,
+                ),
 
-        activeConversationId:
-          state.activeConversationId ===
-          conversationId
-            ? null
-            : state.activeConversationId,
+                activeConversationId:
+                    state.activeConversationId === conversationId
+                        ? null
+                        : state.activeConversationId,
 
-        isLoading: false,
-        error: null,
-      }));
-    } catch (error) {
-      set({
-        isLoading: false,
-        error: error.message,
-      });
-    }
-  },
+                isLoading: false,
+                error: null,
+            }));
+        } catch (error) {
+            set({
+                isLoading: false,
+                error: error.message,
+            });
+        }
+    },
 }));

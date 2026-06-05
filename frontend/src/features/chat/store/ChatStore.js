@@ -1,122 +1,97 @@
 import { create } from "zustand";
 
-import {
-  createMessage,
-  getMessages,
-  streamChat,
-} from "@/services/api";
+import { createMessage, getMessages, streamChat } from "@/services/api";
 
 export const useChatStore = create((set, get) => ({
-  messages: [],
+    messages: [],
 
-  streamingMessage: "",
+    streamingMessage: "",
 
-  isStreaming: false,
+    isStreaming: false,
 
-  isLoading: false,
+    isLoading: false,
 
-  error: null,
+    error: null,
 
-  loadMessages: async (conversationId) => {
-    try {
-      set({
-        isLoading: true,
-        error: null,
-      });
+    loadMessages: async (conversationId) => {
+        try {
+            set({
+                isLoading: true,
+                error: null,
+            });
 
-      const response = await getMessages(
-        conversationId
-      );
+            const response = await getMessages(conversationId);
 
-      set({
-        messages: response.data,
+            set({
+                messages: response.data,
 
-        isLoading: false,
-        error: null,
-      });
-    } catch (error) {
-      set({
-        isLoading: false,
-        error: error.message,
-      });
-    }
-  },
-
-  sendMessage: async (
-    conversationId,
-    data
-  ) => {
-    try {
-      set({
-        isLoading: true,
-        error: null,
-      });
-
-      const createdMessage =
-        await createMessage(
-          conversationId,
-          data
-        );
-
-      set((state) => ({
-        messages: [
-          ...state.messages,
-          createdMessage.data,
-        ],
-
-        isStreaming: true,
-        streamingMessage: "",
-
-        isLoading: false,
-      }));
-
-      await streamChat(
-        conversationId,
-
-        data,
-
-        (token) => {
-          set((state) => ({
-            streamingMessage:
-              state.streamingMessage + token,
-          }));
-        },
-
-        async () => {
-          const aiMessage =
-            await createMessage(
-              conversationId,
-              {
-                content:
-                  get().streamingMessage,
-
-                sender: "assistant",
-              }
-            );
-
-          set((state) => ({
-            messages: [
-              ...state.messages,
-              aiMessage.data,
-            ],
-
-            isStreaming: false,
-            streamingMessage: "",
-          }));
-        },
-
-        (error) => {
-          set({
-            isStreaming: false,
-            error: error.message,
-          });
+                isLoading: false,
+                error: null,
+            });
+        } catch (error) {
+            set({
+                isLoading: false,
+                error: error.message,
+            });
         }
-      );
-    } catch (error) {
-      set({
-        isLoading: false,
-        error: error.message,
-      });
-    }
-  },
+    },
+
+    sendMessage: async (conversationId, data) => {
+        try {
+            set({
+                isLoading: true,
+                error: null,
+            });
+
+            const createdMessage = await createMessage(conversationId, data);
+
+            set((state) => ({
+                messages: [...state.messages, createdMessage.data],
+
+                isStreaming: true,
+                streamingMessage: "",
+
+                isLoading: false,
+            }));
+
+            await streamChat(
+                conversationId,
+
+                data,
+
+                (token) => {
+                    set((state) => ({
+                        streamingMessage: state.streamingMessage + token,
+                    }));
+                },
+
+                async () => {
+                    const aiMessage = await createMessage(conversationId, {
+                        content: get().streamingMessage,
+
+                        sender: "assistant",
+                    });
+
+                    set((state) => ({
+                        messages: [...state.messages, aiMessage.data],
+
+                        isStreaming: false,
+                        streamingMessage: "",
+                    }));
+                },
+
+                (error) => {
+                    set({
+                        isStreaming: false,
+                        error: error.message,
+                    });
+                },
+            );
+        } catch (error) {
+            set({
+                isLoading: false,
+                error: error.message,
+            });
+        }
+    },
 }));

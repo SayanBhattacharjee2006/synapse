@@ -99,10 +99,10 @@ export default function Sidebar({
       </div>
 
       {/* Footer */}
-      <Card className="p-4">
+      <Card className="p-2">
         <div className="flex items-center justify-between">
           <span className="text-base font-bold uppercase">
-            Dark Mode
+            {theme === "dark" ? "Dark Mode" : "Light Mode"}
           </span>
 
           <Button
