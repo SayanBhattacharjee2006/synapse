@@ -1,36 +1,43 @@
+import { cn } from "@/lib/utils";
+
 export default function Button({
-    children,
-    onClick,
-    variant = "primary",
-    size = "md",
-    disabled = false,
-    className = "",
-    ...props
+  children,
+  onClick,
+  variant = "primary",
+  size = "md",
+  disabled = false,
+  className,
+  ...props
 }) {
-    const base =
-        "inline-flex items-center justify-center gap-2 rounded-xl font-medium transition-colors duration-200 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--color-bg-primary)]";
+  const base =
+    "inline-flex items-center justify-center border-2 border-[var(--color-border)] font-bold uppercase transition-all duration-150 active:translate-x-[4px] active:translate-y-[4px] disabled:opacity-50 disabled:pointer-events-none";
 
-    const variants = {
-        primary:
-            "bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] text-white",
-        ghost: "bg-transparent hover:bg-[var(--color-bg-elevated)] text-[var(--color-text-secondary)]",
-        danger: "bg-transparent hover:bg-red-500/10 text-[var(--color-error)]",
-    };
+  const variants = {
+    primary:
+      "bg-[var(--color-primary)] text-[var(--color-foreground)] shadow-[4px_4px_0px_var(--color-border)] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-none",
 
-    const sizes = {
-        sm: "min-h-10 px-4 py-2 text-sm",
-        md: "min-h-12 px-5 py-3 text-base",
-        icon: "h-9 w-9 p-0 text-sm",
-    };
+    secondary:
+      "bg-[var(--color-background)] text-[var(--color-foreground)] shadow-[4px_4px_0px_var(--color-border)] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-none",
 
-    return (
-        <button
-            onClick={onClick}
-            disabled={disabled}
-            {...props}
-            className={`${base} ${sizes[size]} ${variants[variant]} ${className}`}
-        >
-            {children}
-        </button>
-    );
+    ghost:
+      "bg-transparent text-[var(--color-foreground)] hover:bg-[var(--color-surface)]",
+  };
+
+  const sizes = {
+    sm: "h-10 px-4 text-sm",
+    md: "h-12 px-6 text-sm",
+    lg: "h-14 px-8 text-base",
+    icon: "h-12 w-12",
+  };
+
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      className={cn(base, variants[variant], sizes[size], className)}
+      {...props}
+    >
+      {children}
+    </button>
+  );
 }
