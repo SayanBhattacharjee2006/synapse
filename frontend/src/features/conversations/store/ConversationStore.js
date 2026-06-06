@@ -20,6 +20,26 @@ export const useConversationStore = create((set) => ({
         });
     },
 
+    setConversationTitle: (conversationId, title) => {
+        const nextTitle = title?.trim();
+
+        if (!nextTitle) {
+            return;
+        }
+
+        set((state) => ({
+            conversations: state.conversations.map((conversation) =>
+                String(conversation.id) === String(conversationId)
+                    ? {
+                          ...conversation,
+                          title: nextTitle,
+                          slug: nextTitle.toLowerCase().replace(/\s+/g, "-"),
+                      }
+                    : conversation,
+            ),
+        }));
+    },
+
     loadConversations: async () => {
         try {
             set({

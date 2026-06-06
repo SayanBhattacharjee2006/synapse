@@ -15,6 +15,7 @@ export default function ChatPage() {
     const {
         activeConversationId,
         messages,
+        streamingMessage,
         isStreaming,
         handleSendMessage,
     } = useChat();
@@ -50,6 +51,8 @@ export default function ChatPage() {
                 <MessageList
                     conversationId={activeConversationId}
                     messages={messages}
+                    streamingMessage={streamingMessage}
+                    isStreaming={isStreaming}
                 />
 
                 <MessageInput

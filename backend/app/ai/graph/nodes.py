@@ -40,7 +40,7 @@ async def summarisation_node(state: GraphState) -> dict:
 
         summary_respone = await llm.ainvoke([SystemMessage(content=get_summariser_prompt(state.get("summary", ""), messges_to_summarise))])
         messages_to_remove = state["messages"][:-10]
-        print("summary",summary_respone.content)
+        # print("summary",summary_respone.content)
         return {
             "summary": summary_respone.content,
             "last_summarised_msg_id": messges_to_summarise[-1].id,

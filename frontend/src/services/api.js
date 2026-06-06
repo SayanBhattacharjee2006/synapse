@@ -5,6 +5,20 @@ const api = axios.create({
     baseURL: "http://localhost:8000/api/v1",
 });
 
+const readTitlePayload = (data) => {
+    try {
+        const payload = JSON.parse(data);
+
+        if (typeof payload === "string") {
+            return payload;
+        }
+
+        return payload?.title ?? payload?.titel;
+    } catch {
+        return data;
+    }
+};
+
 // Conversations services
 export const getConversations = async () => {
     const response = await api.get("/conversations");
@@ -59,6 +73,7 @@ export const streamChat = async (
     data,
     onToken,
     onDone,
+    onTitle,
     onError,
 ) => {
     await fetchEventSource(`http://localhost:8000/api/v1/conversations/${conversationId}/chat`,{
@@ -69,6 +84,23 @@ export const streamChat = async (
             if(event.data === "[DONE]"){
                 onDone();
                 return ;
+            }
+
+            if (event.event === "title") {
+                onTitle?.(readTitlePayload(event.data));
+                return;
+            }
+
+            try {
+                const payload = JSON.parse(event.data);
+                const title = payload.title ?? payload.titel;
+
+                if (title) {
+                    onTitle?.(title);
+                    return;
+                }
+            } catch {
+                // Non-JSON data is a streamed assistant token.
             }
 
             onToken(event.data);

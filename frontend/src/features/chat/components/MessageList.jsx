@@ -14,6 +14,8 @@ const BOTTOM_THRESHOLD = 32;
 export default function MessageList({
   conversationId,
   messages = [],
+  streamingMessage = "",
+  isStreaming = false,
 }) {
   const scrollContainerRef = useRef(null);
   const previousConversationIdRef = useRef(conversationId);
@@ -69,7 +71,7 @@ export default function MessageList({
       return;
     }
 
-    if (messages.length === 0) {
+    if (messages.length === 0 && !isStreaming) {
       wasAtBottomRef.current = true;
       return;
     }
@@ -87,11 +89,13 @@ export default function MessageList({
   }, [
     conversationId,
     messages,
+    streamingMessage,
+    isStreaming,
     scrollToBottom,
     updateScrollButton,
   ]);
 
-  if (messages.length === 0) {
+  if (messages.length === 0 && !isStreaming) {
     return (
       <div className="flex min-h-0 flex-1 items-center justify-center p-8">
         <p className="text-base font-bold uppercase text-[var(--color-muted)]">
@@ -116,6 +120,13 @@ export default function MessageList({
               content={message.content}
             />
           ))}
+
+          {isStreaming && streamingMessage && (
+            <MessageBubble
+              sender="assistant"
+              content={streamingMessage}
+            />
+          )}
         </div>
       </div>
 

@@ -1,6 +1,7 @@
 import { create } from "zustand";
 
 import { createMessage, getMessages, streamChat } from "@/services/api";
+import { useConversationStore } from "@/features/conversations/store/ConversationStore";
 
 export const useChatStore = create((set, get) => ({
     messages: [],
@@ -70,7 +71,7 @@ export const useChatStore = create((set, get) => ({
                         content: get().streamingMessage,
 
                         sender: "assistant",
-                    });
+                    });                 
 
                     set((state) => ({
                         messages: [...state.messages, aiMessage.data],
@@ -79,7 +80,11 @@ export const useChatStore = create((set, get) => ({
                         streamingMessage: "",
                     }));
                 },
-
+                (title) => {
+                    useConversationStore
+                        .getState()
+                        .setConversationTitle(conversationId, title);
+                },
                 (error) => {
                     set({
                         isStreaming: false,

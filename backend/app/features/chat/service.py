@@ -1,4 +1,5 @@
 import uuid
+import json
 from fastapi import Request
 from sqlalchemy import select, update
 from app.features.chat.schemas import ChatRequest
@@ -6,6 +7,7 @@ from langchain_core.messages import HumanMessage, SystemMessage
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.features.conversations.models import Message, Conversation
 from app.ai.llm import llm
+
 
 async def stream_chat(
     request: Request, conversation_id: uuid.UUID, message: ChatRequest, db: AsyncSession
@@ -30,13 +32,15 @@ async def stream_chat(
             token = event["data"]["chunk"].content
             if token:
                 yield f"data: {token}\n\n"
-    yield "data: [DONE]\n\n"
 
     final_graph_state = await graph.aget_state(config)
-    print(final_graph_state.values)
-    print("latest_summarised_msg_id",final_graph_state.values.get("last_summarised_msg_id"))
-    print("summary",final_graph_state.values.get("summary"))
-    print(len(final_graph_state.values["messages"]))
+    # print(final_graph_state.values)
+    # print(
+    #     "latest_summarised_msg_id",
+    #     final_graph_state.values.get("last_summarised_msg_id"),
+    # )
+    # print("summary", final_graph_state.values.get("summary"))
+    # print(len(final_graph_state.values["messages"]))
     update_values = {
         "summary": final_graph_state.values.get("summary"),
     }
@@ -61,3 +65,8 @@ async def stream_chat(
         .values(**update_values)
     )
     await db.commit()
+
+    if is_first_message:
+        yield f"event: title\ndata: {json.dumps({'title': title})}\n\n"
+
+    yield "data: [DONE]\n\n"
