@@ -6,7 +6,6 @@ from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy import Text, func, ForeignKey, Enum
 from datetime import datetime
 
-
 class SenderEnum(str, enum.Enum):
     user = "user"
     assistant = "assistant"
@@ -18,7 +17,7 @@ class Conversation(Base):
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
     )
-    user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True))
+    user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"))
     slug: Mapped[str]
     title: Mapped[str | None]
     summary: Mapped[str | None] = mapped_column(Text, nullable=True)
@@ -28,9 +27,8 @@ class Conversation(Base):
         "updatedAt", server_default=func.now(), onupdate=func.now()
     )
 
-    messages: Mapped[list["Message"]] = relationship(
-        back_populates="conversation", foreign_keys="[Message.conversation_id]"
-    )
+    messages: Mapped[list["Message"]] = relationship(back_populates="conversation")
+    user: Mapped["User"] = relationship(back_populates="conversations")
 
 
 class Message(Base):
@@ -49,6 +47,4 @@ class Message(Base):
     is_deleted: Mapped[bool] = mapped_column("isDeleted", default=False)
     created_at: Mapped[datetime] = mapped_column("createdAt", server_default=func.now())
 
-    conversation: Mapped["Conversation"] = relationship(
-        back_populates="messages", foreign_keys="[Message.conversation_id]"
-    )
+    conversation: Mapped["Conversation"] = relationship(back_populates="messages")

@@ -6,7 +6,7 @@ from sqlalchemy import pool
 import asyncio
 from alembic import context
 from app.features.conversations.models import Conversation, Message
-
+from app.features.auth.model import User
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
 config = context.config
