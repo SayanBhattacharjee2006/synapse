@@ -25,9 +25,11 @@ class Settings(BaseSettings):
     APP_HOST:str
     APP_PORT:int
 
-    # Hardcoded user for Version 1 (no auth yet)
-    HARDCODED_USER_ID:str
     TEST_DATABASE_URL:PostgresDsn
+
+    SECRET_KEY:str
+    ALGORITHM:str
+    ACCESS_TOKEN_EXPIRE_MINUTES:int
 
     model_config= SettingsConfigDict(
         env_file="../.env",

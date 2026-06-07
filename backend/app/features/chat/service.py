@@ -10,13 +10,13 @@ from app.ai.llm import llm
 
 
 async def stream_chat(
-    request: Request, conversation_id: uuid.UUID, message: ChatRequest, db: AsyncSession
+    request: Request, conversation_id: uuid.UUID, message: ChatRequest, db: AsyncSession, user_id: uuid.UUID
 ):
     graph = request.app.state.graph
     config = {"configurable": {"thread_id": str(conversation_id)}}
 
-    stmt = select(Message).where(
-        Message.conversation_id == conversation_id, Message.is_deleted == False
+    stmt = select(Message).join(Conversation, Conversation.id == Message.conversation_id).where(
+        Message.conversation_id == conversation_id, Message.is_deleted == False, Conversation.user_id == user_id, Conversation.is_deleted == False
     )
 
     messages = (await db.scalars(stmt)).all()
@@ -34,13 +34,6 @@ async def stream_chat(
                 yield f"data: {token}\n\n"
 
     final_graph_state = await graph.aget_state(config)
-    # print(final_graph_state.values)
-    # print(
-    #     "latest_summarised_msg_id",
-    #     final_graph_state.values.get("last_summarised_msg_id"),
-    # )
-    # print("summary", final_graph_state.values.get("summary"))
-    # print(len(final_graph_state.values["messages"]))
     update_values = {
         "summary": final_graph_state.values.get("summary"),
     }
@@ -61,7 +54,7 @@ async def stream_chat(
 
     await db.execute(
         update(Conversation)
-        .where(Conversation.id == conversation_id, Conversation.is_deleted == False)
+        .where(Conversation.id == conversation_id, Conversation.is_deleted == False, Conversation.user_id == user_id)
         .values(**update_values)
     )
     await db.commit()

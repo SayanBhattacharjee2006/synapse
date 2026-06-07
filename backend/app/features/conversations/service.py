@@ -1,42 +1,48 @@
 import uuid
-from app.core.config import settings
 from sqlalchemy import select, update
 from app.features.conversations.models import Conversation, Message
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.features.conversations.schemas import ConversationUpdate, MessageCreate
 
-# Conversation Services 
+# Conversation Services
 
-async def get_all_conversations(db: AsyncSession):
+
+async def get_all_conversations(db: AsyncSession, user_id: uuid.UUID):
 
     stmt = select(Conversation).where(
-        Conversation.user_id == settings.HARDCODED_USER_ID ,
-        Conversation.is_deleted == False)
+        Conversation.user_id == user_id,
+        Conversation.is_deleted == False,
+    ).order_by(Conversation.created_at.desc())
 
     conversations = (await db.scalars(stmt)).all()
     return conversations
 
-async def get_conversation_by_id(db: AsyncSession, conversation_id: uuid.UUID):
+
+async def get_conversation_by_id(
+    db: AsyncSession, conversation_id: uuid.UUID, user_id: uuid.UUID
+):
     stmt = select(Conversation).where(
         Conversation.id == conversation_id,
-        Conversation.is_deleted == False
+        Conversation.is_deleted == False,
+        Conversation.user_id == user_id,
     )
 
     conversation = (await db.scalars(stmt)).one_or_none()
 
-    if conversation is None :
+    if conversation is None:
         raise ValueError("Conversation not found")
 
     return conversation
 
-async def create_conversations(db:AsyncSession):
+
+async def create_conversations(db: AsyncSession, user_id: uuid.UUID):
 
     new_id = uuid.uuid4()
 
     conversation = Conversation(
-        id = new_id,
-        slug = str(new_id),
-        user_id = settings.HARDCODED_USER_ID,
+        id=new_id,
+        slug=str(new_id),
+        user_id=user_id,
     )
 
     db.add(conversation)
@@ -45,18 +51,25 @@ async def create_conversations(db:AsyncSession):
 
     return conversation
 
-async def update_conversations(db:AsyncSession, conversation_id: uuid.UUID, data: ConversationUpdate):
-    
+
+async def update_conversations(
+    db: AsyncSession,
+    conversation_id: uuid.UUID,
+    data: ConversationUpdate,
+    user_id: uuid.UUID,
+):
+
     stmt = select(Conversation).where(
-        Conversation.id == conversation_id, 
-        Conversation.is_deleted == False
+        Conversation.id == conversation_id,
+        Conversation.is_deleted == False,
+        Conversation.user_id == user_id,
     )
 
     conversation = (await db.scalars(stmt)).one_or_none()
 
-    if conversation is None :
+    if conversation is None:
         raise ValueError("Conversation not found")
-    
+
     for field, value in data.model_dump(exclude_unset=True).items():
         setattr(conversation, field, value)
 
@@ -65,21 +78,29 @@ async def update_conversations(db:AsyncSession, conversation_id: uuid.UUID, data
 
     return conversation
 
-async def delete_conversation(db: AsyncSession, conversation_id: uuid.UUID):
+
+async def delete_conversation(
+    db: AsyncSession, conversation_id: uuid.UUID, user_id: uuid.UUID
+):
 
     stmt = select(Conversation).where(
         Conversation.id == conversation_id,
-        Conversation.is_deleted == False
+        Conversation.is_deleted == False,
+        Conversation.user_id == user_id,
     )
 
     conversation = (await db.scalars(stmt)).one_or_none()
 
-    if conversation is None :
+    if conversation is None:
         raise ValueError("Conversation not found")
 
     setattr(conversation, "is_deleted", True)
 
-    await db.execute(update(Message).where(Message.conversation_id == conversation_id).values(is_deleted=True))
+    await db.execute(
+        update(Message)
+        .where(Message.conversation_id == conversation_id)
+        .values(is_deleted=True)
+    )
 
     await db.commit()
     await db.refresh(conversation)
@@ -87,30 +108,38 @@ async def delete_conversation(db: AsyncSession, conversation_id: uuid.UUID):
     return conversation
 
 
-# Message Services 
+# Message Services
 
-async def get_messages(db: AsyncSession, conversation_id: uuid.UUID):
 
-    stmt = select(Message).where(
-        Message.conversation_id == conversation_id,
-        Message.is_deleted == False
-    ).order_by(Message.created_at)
+async def get_messages(db: AsyncSession, conversation_id: uuid.UUID, user_id: uuid.UUID):
+
+    stmt = (
+        select(Message)
+        .join(Conversation, Conversation.id == Message.conversation_id)
+        .where(Message.conversation_id == conversation_id, Message.is_deleted == False, Conversation.user_id == user_id, Conversation.is_deleted == False)
+        .order_by(Message.created_at)
+    )
 
     messages = (await db.scalars(stmt)).all()
 
     return messages
 
-async def delete_message(db: AsyncSession, message_id: uuid.UUID, conversation_id: uuid.UUID):
 
-    stmt = select(Message).where(
+async def delete_message(
+    db: AsyncSession, message_id: uuid.UUID, conversation_id: uuid.UUID, user_id: uuid.UUID
+):
+
+    stmt = select(Message).join(Conversation, Conversation.id == Message.conversation_id).where(
         Message.conversation_id == conversation_id,
         Message.id == message_id,
-        Message.is_deleted == False
+        Message.is_deleted == False,
+        Conversation.user_id == user_id,
+        Conversation.is_deleted == False,
     )
 
     message = (await db.scalars(stmt)).one_or_none()
 
-    if message is None :
+    if message is None:
         raise ValueError("Message not found")
 
     setattr(message, "is_deleted", True)
@@ -120,12 +149,19 @@ async def delete_message(db: AsyncSession, message_id: uuid.UUID, conversation_i
 
     return message
 
-async def create_message(db: AsyncSession, conversation_id: uuid.UUID, data: MessageCreate):
+
+async def create_message(
+    db: AsyncSession, conversation_id: uuid.UUID, data: MessageCreate, user_id: uuid.UUID
+):
+    stmt = select(Conversation).where(Conversation.id == conversation_id, Conversation.user_id == user_id ,Conversation.is_deleted == False)
+
+    conversation = (await db.scalars(stmt)).one_or_none()
+
+    if conversation is None:
+        raise ValueError("Conversation not found")
 
     message = Message(
-        content = data.content,
-        sender = data.sender,
-        conversation_id = conversation_id
+        content=data.content, sender=data.sender, conversation_id=conversation_id
     )
 
     db.add(message)
