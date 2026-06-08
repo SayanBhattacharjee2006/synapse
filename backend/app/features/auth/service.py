@@ -15,6 +15,7 @@ from app.features.auth.model import User
 from app.features.auth.schemas import (
     UserCreate,
     UserLogin,
+    AuthResponse,
 )
 
 
@@ -22,7 +23,7 @@ async def authenticate_user(
     db: AsyncSession,
     user_login: UserLogin,
 ) -> User:
-    
+
     user = await get_user_by_email(
         db,
         user_login.email,
@@ -51,7 +52,7 @@ async def authenticate_user(
 async def login_user(
     db: AsyncSession,
     user_login: UserLogin,
-) -> str:
+) -> AuthResponse:
 
     user = await authenticate_user(
         db,
@@ -64,19 +65,25 @@ async def login_user(
         }
     )
 
-    return access_token
+    return AuthResponse(
+        id=user.id,
+        display_name=user.display_name,
+        email=user.email,
+        created_at=user.created_at,
+        updated_at=user.updated_at,
+        access_token=access_token,
+        token_type="bearer",
+    )
 
 
 async def register_user(
     db: AsyncSession,
     user_create: UserCreate,
-) -> User:
+) -> AuthResponse:
 
     user = User(
         email=user_create.email,
-        hashed_password=hash_password(
-            user_create.password
-        ),
+        hashed_password=hash_password(user_create.password),
         display_name=user_create.display_name,
     )
 
@@ -96,7 +103,21 @@ async def register_user(
             detail="User already exists",
         )
 
-    return user
+    access_token = create_access_token(
+        {
+            "sub": str(user.id),
+        }
+    )
+
+    return AuthResponse(
+        id=user.id,
+        display_name=user.display_name,
+        email=user.email,
+        created_at=user.created_at,
+        updated_at=user.updated_at,
+        access_token=access_token,
+        token_type="bearer",
+    )
 
 
 async def get_user_by_id(
@@ -109,9 +130,7 @@ async def get_user_by_id(
         User.is_deleted == False,
     )
 
-    user = (
-        await db.scalars(stmt)
-    ).one_or_none()
+    user = (await db.scalars(stmt)).one_or_none()
 
     return user
 
@@ -126,9 +145,6 @@ async def get_user_by_email(
         User.is_deleted == False,
     )
 
-    user = (
-        await db.scalars(stmt)
-    ).one_or_none()
+    user = (await db.scalars(stmt)).one_or_none()
 
     return user
-
