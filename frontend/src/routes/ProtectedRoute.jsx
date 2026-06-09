@@ -1,6 +1,6 @@
-import {useAuthStore} from "@/features/auth/store/AuthStore.js";
-import Spinner from "@/components/ui/Spinner.jsx";
-import { Navigate, Outlet } from "react-router-dom"
+import { Navigate, Outlet } from "react-router-dom";
+import { Spinner } from "@/components/ui";
+import { useAuthStore } from "@/features/auth";
 
 function ProtectedRoute() {
     const { isAuthenticated, isAuthLoading } = useAuthStore();
@@ -9,7 +9,7 @@ function ProtectedRoute() {
         return <Spinner size="lg" />;
     }
 
-    return isAuthenticated ? <Outlet/> : < Navigate to="/login" replace/>;
+    return isAuthenticated ? <Outlet /> : <Navigate to="/login" replace />;
 }
 
-export default ProtectedRoute
+export default ProtectedRoute;

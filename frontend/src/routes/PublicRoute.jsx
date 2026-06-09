@@ -1,6 +1,7 @@
-import Spinner from "@/components/ui/Spinner.jsx";
-import { useAuthStore } from "@/features/auth/store/AuthStore.js";
 import { Navigate, Outlet } from "react-router-dom";
+import { Spinner } from "@/components/ui";
+import { useAuthStore } from "@/features/auth";
+
 function PublicRoute() {
     const { isAuthenticated, isAuthLoading } = useAuthStore();
     return isAuthLoading ? (

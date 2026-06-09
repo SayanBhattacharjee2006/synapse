@@ -1,9 +1,5 @@
 import { create } from "zustand";
-import {
-    login,
-    register,
-    authCheck,
-} from "@/features/auth/services/authService.js";
+import { authCheck, login, register } from "@/features/auth/services";
 
 export const useAuthStore = create((set) => ({
     user: null,

@@ -82,7 +82,7 @@ async def register_user(
 ) -> AuthResponse:
 
     user = User(
-        email=user_create.email,
+        email=user_create.email.lower(),
         hashed_password=hash_password(user_create.password),
         display_name=user_create.display_name,
     )

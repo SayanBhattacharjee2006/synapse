@@ -11,6 +11,7 @@
     --color-border: #000000;
     --color-muted: #6b7280;
     --color-danger: #ff4d4f;
+    --color-accent: var(--color-primary);
     --color-convo: #f5f5f5;
     --color-msg: #ffffff;
     /* TYPOGRAPHY */
@@ -28,6 +29,18 @@
     /* LAYOUT */
     --sidebar-width: 280px;
     --header-height: 64px;
+    --spacing-app-height: var(--app-height);
+    --spacing-auth-page: var(--auth-page-gutter);
+    --spacing-auth-header: var(--auth-header-height);
+    --spacing-auth-main: calc(var(--app-height) - var(--auth-header-height));
+    --spacing-auth-panel-padding: var(--auth-panel-padding);
+    --spacing-auth-panel-offset: var(--auth-panel-offset);
+    --spacing-auth-panel-gap: var(--auth-panel-gap);
+    --spacing-auth-form-gap: var(--auth-form-gap);
+    --spacing-auth-field-gap: var(--auth-field-gap);
+    --spacing-auth-field: var(--auth-field-height);
+    --spacing-auth-line: var(--auth-border-width);
+    --container-auth-panel: var(--auth-panel-width);
 
     /* RADIUS */
     --radius-brutal: 0px;
@@ -36,7 +49,7 @@
 :root {
     color-scheme: light;
 
-    --app-height: 100vh;
+    --app-height: 100dvh;
     --safe-area-top: env(safe-area-inset-top, 0px);
     --safe-area-right: env(safe-area-inset-right, 0px);
     --safe-area-bottom: env(safe-area-inset-bottom, 0px);
@@ -49,6 +62,27 @@
     --color-border: #000000;
     --color-muted: #6b7280;
     --color-danger: #ff4d4f;
+    --color-accent: var(--color-primary);
+
+    --auth-page-background: #ffffff;
+    --auth-panel-background: #ffffff;
+    --auth-header-border: #000000;
+    --auth-line: #000000;
+    --auth-muted: #8b8b8b;
+    --auth-link: #c8aa00;
+    --auth-icon: #000000;
+    --auth-page-gutter: 3rem;
+    --auth-header-height: 4.5rem;
+    --auth-panel-width: 32.5rem;
+    --auth-panel-padding: 1.75rem;
+    --auth-panel-offset: 0.75rem;
+    --auth-panel-gap: 1.25rem;
+    --auth-form-gap: 1rem;
+    --auth-field-gap: 0.5rem;
+    --auth-border-width: 0.25rem;
+    --auth-field-height: 3.75rem;
+    --auth-button-shadow: 0.375rem 0.375rem 0 #000000;
+    --auth-card-shadow: 0.75rem 0.75rem 0 var(--color-primary);
 }
 
 @supports (height: 100dvh) {
@@ -67,8 +101,18 @@ html.dark {
     --color-border: #ffffff;
     --color-muted: #9ca3af;
     --color-danger: #ff4d4f;
+    --color-accent: var(--color-primary);
     --color-convo: #000000;
     --color-msg: #000000;
+
+    --auth-page-background: #050505;
+    --auth-panel-background: #141414;
+    --auth-header-border: var(--color-primary);
+    --auth-line: #ffffff;
+    --auth-muted: #8f8f8f;
+    --auth-link: var(--color-primary);
+    --auth-icon: var(--color-primary);
+    --auth-button-shadow: 0.375rem 0.375rem 0 #ffffff;
 }
 
 * {
@@ -90,7 +134,7 @@ body {
 
     font-family: var(--font-body);
     font-weight: 500;
-    letter-spacing: -0.02em;
+    letter-spacing: 0;
     font-size: 17px;
     line-height: 1.5;
 
@@ -115,4 +159,22 @@ body {
 ::selection {
     background: var(--color-primary);
     color: var(--color-foreground);
+}
+
+@media (max-width: 640px) {
+    :root {
+        --auth-page-gutter: 1.25rem;
+        --auth-header-height: 4.75rem;
+        --auth-panel-padding: 1.5rem;
+        --auth-panel-offset: 0.5rem;
+        --auth-panel-gap: 1rem;
+        --auth-form-gap: 0.875rem;
+        --auth-field-height: 3.5rem;
+        --auth-button-shadow: 0.25rem 0.25rem 0 #000000;
+        --auth-card-shadow: 0.5rem 0.5rem 0 var(--color-primary);
+    }
+
+    html.dark {
+        --auth-button-shadow: 0.25rem 0.25rem 0 #ffffff;
+    }
 }
