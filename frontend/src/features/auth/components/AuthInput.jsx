@@ -6,6 +6,7 @@ function AuthInput({
     value,
     onChange,
     textCase = type === "email" ? "lowercase" : "normal",
+    ...inputProps
 }) {
     const textCaseClassName =
         textCase === "lowercase"
@@ -26,6 +27,7 @@ function AuthInput({
                     value={value}
                     onChange={onChange}
                     placeholder={placeholder}
+                    {...inputProps}
                     className={`h-full w-full bg-transparent text-sm font-medium ${textCaseClassName} text-[var(--color-foreground)] outline-none placeholder:uppercase placeholder:text-[var(--auth-muted)]`}
                 />
             </div>

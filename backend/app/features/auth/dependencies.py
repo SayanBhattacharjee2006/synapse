@@ -7,7 +7,7 @@ from fastapi import (
 )
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.core.database import get_db
+from app.core.dependencies import get_db
 from app.core.security import decode_access_token
 from app.features.auth.model import User
 from app.features.auth import service
@@ -47,6 +47,8 @@ async def get_current_user(
         db,
         user_uuid,
     )
+
+    print(user)
 
     if user is None:
         raise credentials_exception

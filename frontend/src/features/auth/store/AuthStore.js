@@ -1,42 +1,76 @@
 import { create } from "zustand";
 import { authCheck, login, register } from "@/features/auth/services";
 
+const getStoredToken = () => {
+    try {
+        return localStorage.getItem("access_token");
+    } catch {
+        return null;
+    }
+};
+
+const normalizeError = (error) => {
+    const detail = error?.response?.data?.detail;
+
+    if (typeof detail === "string") {
+        return detail;
+    }
+
+    if (Array.isArray(detail)) {
+        return detail
+            .map((item) => item?.msg || item?.message)
+            .filter(Boolean)
+            .join(", ");
+    }
+
+    return error?.message || "Something went wrong";
+};
+
+const initialToken = getStoredToken();
+
 export const useAuthStore = create((set) => ({
     user: null,
     isAuthenticated: false,
-    isAuthLoading: false,
+    isAuthLoading: Boolean(initialToken),
     error: null,
     isLoading: false,
-    token: null,
+    token: initialToken,
 
     login: async (data) => {
         try {
             set({
                 isLoading: true,
+                error: null,
                 user: null,
                 token: null,
             });
 
             const response = await login(data);
+            const user = buildUser(response.data);
 
             localStorage.setItem("access_token", response.data.access_token);
 
             set({
                 isLoading: false,
-                user: buildUser(response.data),
+                user,
                 token: response.data.access_token,
                 isAuthenticated: true,
                 error: null,
             });
+
+            return { success: true, user };
         } catch (error) {
+            const message = normalizeError(error);
+
             set({
                 isLoading: false,
-                error: error?.response?.data?.detail || error.message,
+                user: null,
+                token: null,
+                isAuthenticated: false,
+                error: message,
             });
-        } finally {
-            set({
-                isLoading: false,
-            });
+
+            return { success: false, error: message };
         }
     },
 
@@ -44,30 +78,37 @@ export const useAuthStore = create((set) => ({
         try {
             set({
                 isLoading: true,
+                error: null,
                 user: null,
                 token: null,
             });
 
             const response = await register(data);
+            const user = buildUser(response.data);
 
             localStorage.setItem("access_token", response.data.access_token);
 
             set({
                 isLoading: false,
-                user: buildUser(response.data),
+                user,
                 token: response.data.access_token,
                 isAuthenticated: true,
                 error: null,
             });
+
+            return { success: true, user };
         } catch (error) {
+            const message = normalizeError(error);
+
             set({
                 isLoading: false,
-                error: error?.response?.data?.detail || error.message,
+                user: null,
+                token: null,
+                isAuthenticated: false,
+                error: message,
             });
-        } finally {
-            set({
-                isLoading: false,
-            });
+
+            return { success: false, error: message };
         }
     },
 
@@ -77,8 +118,12 @@ export const useAuthStore = create((set) => ({
             user: null,
             isAuthenticated: false,
             token: null,
+            error: null,
+            isLoading: false,
         });
     },
+
+    clearError: () => set({ error: null }),
 
     checkAuthentication: async () => {
         set({ isAuthLoading: true });
@@ -95,6 +140,7 @@ export const useAuthStore = create((set) => ({
         } else {
             try {
                 const response = await authCheck();
+                console.log(response.data);
                 set({
                     user: buildUser(response.data),
                     token: token,
@@ -102,14 +148,14 @@ export const useAuthStore = create((set) => ({
                     isAuthLoading: false,
                     error: null,
                 });
-            } catch (error) {
+            } catch {
                 localStorage.removeItem("access_token");
                 set({
                     user: null,
                     isAuthenticated: false,
                     token: null,
                     isAuthLoading: false,
-                    error: error?.response?.data?.detail || error.message,
+                    error: null,
                 });
             }
         }

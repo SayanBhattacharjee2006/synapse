@@ -1,5 +1,5 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from pydantic import PostgresDsn
+from pydantic import PostgresDsn, model_validator
 
 class Settings(BaseSettings):
   
@@ -24,14 +24,23 @@ class Settings(BaseSettings):
     APP_ENV:str
     APP_HOST:str
     APP_PORT:int
-
     TEST_DATABASE_URL:PostgresDsn
 
-    SECRET_KEY:str
-    ALGORITHM:str
-    ACCESS_TOKEN_EXPIRE_MINUTES:int
+    SECRET_KEY:str | None = None
+    ALGORITHM:str = "HS256"
+    ACCESS_TOKEN_EXPIRE_MINUTES:int = 30
 
-    VITE_API_BASE_URL:str
+    @model_validator(mode="after")
+    def validate_auth_settings(self):
+        if self.SECRET_KEY:
+            return self
+
+        if self.APP_ENV.lower() in {"production", "prod"}:
+            raise ValueError("SECRET_KEY must be set in production")
+
+        self.SECRET_KEY = "dev-only-insecure-secret-key-change-me"
+        return self
+
 
     model_config= SettingsConfigDict(
         env_file="../.env",
