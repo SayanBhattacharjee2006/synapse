@@ -1,11 +1,11 @@
 import { create } from "zustand";
 
 import {
-    getConversations,
     createConversations,
-    updateConversations,
     deleteConversations,
-} from "@/services/api";
+    getConversations,
+    updateConversations,
+} from "@/features/conversations/services/conversationService";
 
 export const useConversationStore = create((set) => ({
     conversations: [],

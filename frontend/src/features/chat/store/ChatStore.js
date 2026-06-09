@@ -1,6 +1,10 @@
 import { create } from "zustand";
 
-import { createMessage, getMessages, streamChat } from "@/services/api";
+import {
+    createMessage,
+    getMessages,
+    streamChat,
+} from "@/features/chat/services/chatService";
 import { useConversationStore } from "@/features/conversations/store/ConversationStore";
 
 export const useChatStore = create((set, get) => ({
