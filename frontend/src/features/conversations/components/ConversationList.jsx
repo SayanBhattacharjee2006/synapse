@@ -4,6 +4,8 @@ export default function ConversationList({
   conversations = [],
   activeConversationId,
   onSelectConversation,
+  onRenameConversation,
+  onDeleteConversation,
 }) {
   if (conversations.length === 0) {
     return (
@@ -24,10 +26,16 @@ export default function ConversationList({
             conversation.title?.trim() ||
             "New Chat"
           }
-          updatedAt={conversation.updatedAt}
-          active={conversation.id === activeConversationId}
+          updatedAt={conversation.updatedAt || conversation.updated_at}
+          active={String(conversation.id) === String(activeConversationId)}
           onClick={() =>
-            onSelectConversation(conversation.id)
+            onSelectConversation?.(conversation.id)
+          }
+          onRename={(title) =>
+            onRenameConversation?.(conversation.id, title)
+          }
+          onDelete={() =>
+            onDeleteConversation?.(conversation.id)
           }
         />
       ))}

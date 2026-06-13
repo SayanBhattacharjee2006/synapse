@@ -16,6 +16,23 @@ const readTitlePayload = (data) => {
     }
 };
 
+const buildStreamUrl = (path) => {
+    const baseURL = api.defaults.baseURL || "/api/v1";
+
+    return `${baseURL.replace(/\/$/, "")}${path}`;
+};
+
+const buildStreamHeaders = () => {
+    const headers = { "Content-Type": "application/json" };
+    const token = localStorage.getItem("access_token");
+
+    if (token) {
+        headers.Authorization = `Bearer ${token}`;
+    }
+
+    return headers;
+};
+
 export const getMessages = async (conversationsId) => {
     const response = await api.get(
         `/conversations/${conversationsId}/messages`,
@@ -47,11 +64,11 @@ export const streamChat = async (
     onError,
 ) => {
     await fetchEventSource(
-        `http://localhost:8000/api/v1/conversations/${conversationId}/chat`,
+        buildStreamUrl(`/conversations/${conversationId}/chat`),
         {
             method: "POST",
             body: JSON.stringify(data),
-            headers: { "Content-Type": "application/json" },
+            headers: buildStreamHeaders(),
             onmessage: (event) => {
                 if (event.data === "[DONE]") {
                     onDone();

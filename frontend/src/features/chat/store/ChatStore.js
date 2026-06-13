@@ -18,6 +18,16 @@ export const useChatStore = create((set, get) => ({
 
     error: null,
 
+    clearMessages: () => {
+        set({
+            messages: [],
+            streamingMessage: "",
+            isStreaming: false,
+            isLoading: false,
+            error: null,
+        });
+    },
+
     loadMessages: async (conversationId) => {
         try {
             set({

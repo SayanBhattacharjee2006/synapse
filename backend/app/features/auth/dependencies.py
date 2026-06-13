@@ -47,9 +47,7 @@ async def get_current_user(
         db,
         user_uuid,
     )
-
-    print(user)
-
+    
     if user is None:
         raise credentials_exception
 

@@ -20,6 +20,15 @@ export const useConversationStore = create((set) => ({
         });
     },
 
+    clearConversations: () => {
+        set({
+            conversations: [],
+            activeConversationId: null,
+            isLoading: false,
+            error: null,
+        });
+    },
+
     setConversationTitle: (conversationId, title) => {
         const nextTitle = title?.trim();
 
@@ -100,7 +109,7 @@ export const useConversationStore = create((set) => ({
 
             set((state) => ({
                 conversations: state.conversations.map((conversation) =>
-                    conversation.id === conversationId
+                    String(conversation.id) === String(conversationId)
                         ? response.data
                         : conversation,
                 ),
@@ -108,6 +117,8 @@ export const useConversationStore = create((set) => ({
                 isLoading: false,
                 error: null,
             }));
+
+            return response.data;
         } catch (error) {
             set({
                 isLoading: false,
@@ -127,17 +138,20 @@ export const useConversationStore = create((set) => ({
 
             set((state) => ({
                 conversations: state.conversations.filter(
-                    (conversation) => conversation.id !== conversationId,
+                    (conversation) =>
+                        String(conversation.id) !== String(conversationId),
                 ),
 
                 activeConversationId:
-                    state.activeConversationId === conversationId
+                    String(state.activeConversationId) === String(conversationId)
                         ? null
                         : state.activeConversationId,
 
                 isLoading: false,
                 error: null,
             }));
+
+            return true;
         } catch (error) {
             set({
                 isLoading: false,

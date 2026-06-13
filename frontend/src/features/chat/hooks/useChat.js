@@ -17,12 +17,15 @@ export function useChat() {
     messages,
     streamingMessage,
     isStreaming,
+    clearMessages,
     loadMessages,
     sendMessage,
   } = useChatStore();
 
   useEffect(() => {
     if (!conversationId) {
+      setActiveConversationId(null);
+      clearMessages();
       return;
     }
 
@@ -33,6 +36,7 @@ export function useChat() {
     loadMessages(conversationId);
   }, [
     conversationId,
+    clearMessages,
     loadMessages,
     setActiveConversationId,
   ]);
