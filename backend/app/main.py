@@ -8,8 +8,7 @@ from app.ai.graph.graph import get_graph
 from app.features.chat.router import router as chat_router
 from fastapi.middleware.cors import CORSMiddleware
 from app.features.auth.router import router as auth_router
-
-
+from app.ai.rag.collections import create_collections
 
 origins = [
     'http://localhost:5173',
@@ -17,10 +16,15 @@ origins = [
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+
+    create_collections()
+
     async with AsyncPostgresSaver.from_conn_string(str(settings.DATABASE_URL).replace("+asyncpg", "")) as checkpoint_saver:
         await checkpoint_saver.setup()
         app.state.graph = get_graph(checkpoint_saver)
         yield
+
+
 
 
 app = FastAPI(

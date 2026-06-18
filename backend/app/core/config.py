@@ -30,6 +30,12 @@ class Settings(BaseSettings):
     ALGORITHM:str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES:int = 30
 
+    #vector store
+    QDRANT_URL:str
+    QDRANT_CONVERSATIONS_COLLECTION:str
+    QDRANT_SUMMARIES_COLLECTION:str
+    QDRANT_DOCUMENTS_COLLECTION:str
+
     @model_validator(mode="after")
     def validate_auth_settings(self):
         if self.SECRET_KEY:

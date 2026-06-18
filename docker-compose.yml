@@ -32,9 +32,19 @@ services:
       db:
         condition: service_healthy
 
+  qdrant:
+    image: qdrant/qdrant:latest
+    restart: always
+    container_name: synapse_qdrant
+    ports:
+      - "6333:6333"
+      - "6334:6334"
+    volumes:
+      - qdrant_storage:/qdrant/storage
+
 volumes:
   postgres_data:
-
+  qdrant_storage:
 
 #Never mount entire project folder without masking .venv
 #Windows .venv is incompatible with Linux containers

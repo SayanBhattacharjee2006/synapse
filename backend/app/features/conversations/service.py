@@ -3,6 +3,7 @@ from sqlalchemy import select, update
 from app.features.conversations.models import Conversation, Message
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.features.conversations.schemas import ConversationUpdate, MessageCreate
+from app.ai.rag.services.conversations_memory_service import store_message
 
 # Conversation Services
 
@@ -167,5 +168,7 @@ async def create_message(
     db.add(message)
     await db.commit()
     await db.refresh(message)
+
+    store_message(message, user_id)
 
     return message
