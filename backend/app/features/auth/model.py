@@ -6,6 +6,7 @@ from datetime import datetime
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
+
 class User(Base):
     __tablename__ = "users"
 
@@ -13,7 +14,9 @@ class User(Base):
         UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
     )
     display_name: Mapped[str] = mapped_column("displayName", String(50), nullable=False)
-    email: Mapped[str] = mapped_column("email", String(255), nullable=False, unique=True)
+    email: Mapped[str] = mapped_column(
+        "email", String(255), nullable=False, unique=True
+    )
     hashed_password: Mapped[str] = mapped_column(
         "hashedPassword", String(255), nullable=False
     )
@@ -24,3 +27,5 @@ class User(Base):
     )
 
     conversations: Mapped[list["Conversation"]] = relationship(back_populates="user")
+
+    documents: Mapped[list["Document"]] = relationship(back_populates="user")

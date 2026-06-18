@@ -9,6 +9,7 @@ from app.features.chat.router import router as chat_router
 from fastapi.middleware.cors import CORSMiddleware
 from app.features.auth.router import router as auth_router
 from app.ai.rag.collections import create_collections
+from app.features.documents.router import router as documents_router
 
 origins = [
     'http://localhost:5173',
@@ -45,3 +46,4 @@ app.include_router(health_router, prefix="/api/v1")
 app.include_router(conversation_router, prefix="/api/v1")
 app.include_router(chat_router, prefix="/api/v1")
 app.include_router(auth_router, prefix="/api/v1")
+app.include_router(documents_router, prefix="/api/v1")

@@ -36,6 +36,14 @@ class Settings(BaseSettings):
     QDRANT_SUMMARIES_COLLECTION:str
     QDRANT_DOCUMENTS_COLLECTION:str
 
+    # S3 bucket keys 
+    AWS_ACCESS_KEY_ID: str
+    AWS_SECRET_ACCESS_KEY: str
+    AWS_REGION: str
+    AWS_S3_BUCKET_NAME: str
+    MAX_FILE_SIZE: int
+    CHUNK_SIZE: int
+
     @model_validator(mode="after")
     def validate_auth_settings(self):
         if self.SECRET_KEY:

@@ -6,6 +6,7 @@ from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy import Text, func, ForeignKey, Enum
 from datetime import datetime
 
+
 class SenderEnum(str, enum.Enum):
     user = "user"
     assistant = "assistant"
@@ -17,7 +18,9 @@ class Conversation(Base):
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
     )
-    user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"))
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id")
+    )
     slug: Mapped[str]
     title: Mapped[str | None]
     summary: Mapped[str | None] = mapped_column(Text, nullable=True)
@@ -29,7 +32,7 @@ class Conversation(Base):
 
     messages: Mapped[list["Message"]] = relationship(back_populates="conversation")
     user: Mapped["User"] = relationship(back_populates="conversations")
-
+    documents: Mapped[list["Document"]] = relationship(back_populates="conversation")
 
 class Message(Base):
     __tablename__ = "messages"

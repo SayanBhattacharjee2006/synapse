@@ -12,6 +12,7 @@ from app.core.dependencies import get_db
 from app.features.auth.dependencies import get_current_user
 from app.features.auth.model import User
 
+
 router = APIRouter(prefix="/conversations", tags=["conversations"])
 
 
