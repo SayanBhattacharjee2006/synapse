@@ -7,6 +7,7 @@ import {
 
 import { Button } from "@/components/ui";
 import { MessageBubble } from "@/features/chat";
+import { cn } from "@/lib/utils";
 import { ArrowDown } from "lucide-react";
 
 const BOTTOM_THRESHOLD = 32;
@@ -16,6 +17,7 @@ export default function MessageList({
   messages = [],
   streamingMessage = "",
   isStreaming = false,
+  className,
 }) {
   const scrollContainerRef = useRef(null);
   const previousConversationIdRef = useRef(conversationId);
@@ -97,7 +99,12 @@ export default function MessageList({
 
   if (messages.length === 0 && !isStreaming) {
     return (
-      <div className="flex min-h-0 flex-1 items-center justify-center p-8">
+      <div
+        className={cn(
+          "flex min-h-0 flex-1 items-center justify-center p-8",
+          className,
+        )}
+      >
         <p className="text-base font-bold uppercase text-[var(--color-muted)]">
           Start a conversation
         </p>
@@ -106,7 +113,7 @@ export default function MessageList({
   }
 
   return (
-    <div className="relative min-h-0 flex-1">
+    <div className={cn("relative min-h-0 flex-1", className)}>
       <div
         ref={scrollContainerRef}
         className="h-full overflow-y-auto p-8"

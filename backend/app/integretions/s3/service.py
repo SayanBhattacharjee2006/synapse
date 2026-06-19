@@ -14,3 +14,9 @@ async def upload_to_s3(file_obj: BinaryIO, key: str) -> None:
         s3_client.upload_fileobj(file_obj, settings.AWS_S3_BUCKET_NAME, key)
     except ClientError as e:
         raise HTTPException(status_code=500, detail=f"Failed to upload file to S3: {e}")
+    
+async def delete_s3_obj(s3_key: str) -> None:
+    try:
+        s3_client.delete_object(Bucket=settings.AWS_S3_BUCKET_NAME, Key=s3_key)
+    except ClientError as e:
+        raise HTTPException(status_code=500, detail=f"Failed to delete file from S3: {e}")
