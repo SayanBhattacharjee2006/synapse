@@ -44,6 +44,11 @@ class Settings(BaseSettings):
     MAX_FILE_SIZE: int
     CHUNK_SIZE: int
 
+    # RAG
+    
+    RAG_CHUNK_SIZE:int
+    RAG_OVERLAP:int
+
     @model_validator(mode="after")
     def validate_auth_settings(self):
         if self.SECRET_KEY:

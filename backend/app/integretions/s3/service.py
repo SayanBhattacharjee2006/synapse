@@ -3,7 +3,8 @@ from app.core.config import settings
 from app.integretions.s3.client import s3_client
 from botocore.exceptions import ClientError
 from typing import BinaryIO
-
+import tempfile
+from pathlib import Path
 
 def generate_s3_key(user_id: str,conversation_id: str,document_id: str,filename: str)-> str:
     return f"documents/{user_id}/{conversation_id}/{document_id}/{filename}"
@@ -20,3 +21,28 @@ async def delete_s3_obj(s3_key: str) -> None:
         s3_client.delete_object(Bucket=settings.AWS_S3_BUCKET_NAME, Key=s3_key)
     except ClientError as e:
         raise HTTPException(status_code=500, detail=f"Failed to delete file from S3: {e}")
+    
+
+def download_from_s3(s3_key: str) -> str:
+    try:
+        suffix = Path(s3_key).suffix
+
+        with tempfile.NamedTemporaryFile(
+            delete=False,
+            suffix=suffix,
+        ) as temp_file:
+
+            s3_client.download_fileobj(
+                settings.AWS_S3_BUCKET_NAME,
+                s3_key,
+                temp_file,
+            )
+
+            return temp_file.name
+
+    except ClientError as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to download file from S3: {e}",
+        )
+        

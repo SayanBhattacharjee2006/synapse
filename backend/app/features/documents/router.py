@@ -1,13 +1,13 @@
 import uuid
 
-from fastapi import APIRouter, Depends, UploadFile, File, status
+from fastapi import APIRouter, Depends, UploadFile, File, status, BackgroundTasks
 from sqlalchemy.ext.asyncio import AsyncSession
-
 from app.core.dependencies import get_db
 from app.features.auth.dependencies import get_current_user
 from app.features.auth.model import User
 from app.features.documents.schemas import DocumentResponse
 from app.features.documents.service import upload_document, get_document, delete_document
+from app.features.documents.processing import process_document
 
 router = APIRouter(tags=["documents"])
 
@@ -18,6 +18,7 @@ router = APIRouter(tags=["documents"])
     status_code=status.HTTP_201_CREATED,
 )
 async def upload_document_handler(
+    background_tasks: BackgroundTasks,
     conversation_id: uuid.UUID,
     file: UploadFile = File(...),
     db: AsyncSession = Depends(get_db),
@@ -29,6 +30,8 @@ async def upload_document_handler(
         user_id=current_user.id,
         conversation_id=conversation_id,
     )
+
+    background_tasks.add_task(process_document, document.id)
 
     return document
 
