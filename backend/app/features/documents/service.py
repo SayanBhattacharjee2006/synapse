@@ -7,7 +7,7 @@ from app.integretions.s3.service import upload_to_s3, generate_s3_key, delete_s3
 from app.features.documents.model import Document
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.features.conversations.models import Conversation
-
+from app.ai.rag.services.document_memory_service import delete_document_chunks
 
 async def upload_document(db:AsyncSession ,file: UploadFile, user_id: uuid.UUID,conversation_id: uuid.UUID):
     # extension validation
@@ -112,6 +112,9 @@ async def delete_document(db:AsyncSession, conversation_id: uuid.UUID, document_
         raise HTTPException(status_code=404, detail="Document not found")
 
     try:
+
+        delete_document_chunks(document_id)
+
         # delete document row in postgresql using sqlalchemy
         await delete_s3_obj(document.s3_key)
         document.is_deleted = True

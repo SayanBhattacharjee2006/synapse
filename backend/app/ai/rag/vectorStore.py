@@ -27,3 +27,4 @@ def get_document_vector_store():
         embedding=embeddings,
     )
     return document_vector_store
+

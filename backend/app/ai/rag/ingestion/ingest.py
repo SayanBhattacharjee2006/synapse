@@ -4,8 +4,11 @@ from app.ai.rag.vectorStore import get_document_vector_store
 
 
 async def ingest_document(document, file_path):
+    print(f"Ingesting document {document.filename}...")
 
     documents = await load_document(file_path)
+    
+    print(f"Loaded {len(documents)} documents from {document.filename}...")
 
     for doc in documents:
         doc.metadata.update(
@@ -17,8 +20,14 @@ async def ingest_document(document, file_path):
             }
         )
 
+    print(f"Added document metadata to {len(documents)} documents...")
+
     text_chunks = await split_documents(documents)
 
+    print(f"Split {len(documents)} documents into {len(text_chunks)} chunks...")
+
     vector_store = get_document_vector_store()
+
+    print(f"Adding {len(text_chunks)} chunks to vector store...")
 
     await vector_store.aadd_documents(text_chunks)

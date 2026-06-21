@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 
 import { Button } from "@/components/ui";
 import { UploadDropzone, UploadFileCard } from "@/features/documents";
@@ -21,6 +21,7 @@ export default function UploadPanel({
         useState("");
 
     const {
+        documents,
         uploadDocument,
         isUploading,
         uploadError,
@@ -35,6 +36,33 @@ export default function UploadPanel({
             ),
         );
     };
+
+    const syncedQueuedDocuments = useMemo(
+        () =>
+            queuedDocuments.map((queuedDocument) => {
+                const syncedDocument = documents.find(
+                    (document) =>
+                        String(document.id) ===
+                        String(queuedDocument.id),
+                );
+
+                if (!syncedDocument) {
+                    return queuedDocument;
+                }
+
+                return {
+                    ...queuedDocument,
+                    ...syncedDocument,
+                    queueId: queuedDocument.queueId,
+                    file: queuedDocument.file,
+                    uiStatus:
+                        syncedDocument.processing_status ||
+                        syncedDocument.processingStatus ||
+                        queuedDocument.uiStatus,
+                };
+            }),
+        [documents, queuedDocuments],
+    );
 
     const handleFilesSelected = async (
         acceptedFiles,
@@ -151,9 +179,9 @@ export default function UploadPanel({
                     </div>
                 )}
 
-                {queuedDocuments.length > 0 && (
+                {syncedQueuedDocuments.length > 0 && (
                     <div className="grid gap-3 md:grid-cols-2">
-                        {queuedDocuments.map((document) => (
+                        {syncedQueuedDocuments.map((document) => (
                             <UploadFileCard
                                 key={document.queueId}
                                 document={document}

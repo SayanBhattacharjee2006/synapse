@@ -55,13 +55,18 @@ export const useDocumentStore = create((set) => ({
         }
     },
 
-    loadDocuments: async (conversationId) => {
+    loadDocuments: async (conversationId, options = {}) => {
         if (!conversationId) {
             return [];
         }
 
+        const { silent = false } = options;
+
         try {
-            set({ isLoading: true, error: null });
+            set((state) => ({
+                isLoading: silent ? state.isLoading : true,
+                error: null,
+            }));
 
             const response = await getDocumentsService(conversationId);
             const documents = (response.data || []).map((document) =>
@@ -80,7 +85,7 @@ export const useDocumentStore = create((set) => ({
                             String(conversationId),
                     ),
                 ],
-                isLoading: false,
+                isLoading: silent ? state.isLoading : false,
                 error: null,
             }));
 
@@ -91,10 +96,10 @@ export const useDocumentStore = create((set) => ({
                 "Failed to load documents",
             );
 
-            set({
-                isLoading: false,
+            set((state) => ({
+                isLoading: silent ? state.isLoading : false,
                 error: message,
-            });
+            }));
 
             throw new Error(message, { cause: error });
         }

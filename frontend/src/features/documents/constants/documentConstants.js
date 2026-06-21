@@ -33,6 +33,13 @@ export const ACCEPTED_FILE_MIME_TYPES = {
 
 export const MAX_FILE_SIZE_MB = 20;
 export const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
+export const DOCUMENT_STATUS_POLL_INTERVAL_MS = 4000;
+
+export const DOCUMENT_ACTIVE_STATUSES = [
+    "uploading",
+    "pending",
+    "processing",
+];
 
 export const DOCUMENT_STATUS_LABELS = {
     ready: "Ready",

@@ -36,6 +36,8 @@ async def process_document(document_id: uuid.UUID):
             document.error_message = None
             await session.commit() 
 
+            print(f"Document processing completed: {document.filename}")
+
         except Exception as e:
             if document :
                 document.processing_status = ProcessingStatusEnum.failed

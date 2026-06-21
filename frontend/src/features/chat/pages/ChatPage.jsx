@@ -13,6 +13,11 @@ import {
     UploadPanel,
     useDocumentStore,
 } from "@/features/documents";
+import {
+    DOCUMENT_ACTIVE_STATUSES,
+    DOCUMENT_STATUS_POLL_INTERVAL_MS,
+} from "@/features/documents/constants/documentConstants";
+import { getDocumentStatus } from "@/features/documents/utils/documentUtils";
 
 import { useChat } from "@/features/chat/hooks/useChat";
 import { useConversationStore } from "@/features/conversations/store/ConversationStore";
@@ -62,6 +67,15 @@ export default function ChatPage() {
                 String(activeConversationId),
         );
     }, [activeConversationId, documents]);
+    const hasDocumentsInProgress = useMemo(
+        () =>
+            conversationDocuments.some((document) =>
+                DOCUMENT_ACTIVE_STATUSES.includes(
+                    getDocumentStatus(document),
+                ),
+            ),
+        [conversationDocuments],
+    );
     const fileCount = conversationDocuments.length;
     const isUploadOpen =
         hasActiveConversation &&
@@ -79,6 +93,24 @@ export default function ChatPage() {
 
         loadDocuments(activeConversationId).catch(() => {});
     }, [activeConversationId, loadDocuments]);
+
+    useEffect(() => {
+        if (!activeConversationId || !hasDocumentsInProgress) {
+            return;
+        }
+
+        const intervalId = window.setInterval(() => {
+            loadDocuments(activeConversationId, {
+                silent: true,
+            }).catch(() => {});
+        }, DOCUMENT_STATUS_POLL_INTERVAL_MS);
+
+        return () => window.clearInterval(intervalId);
+    }, [
+        activeConversationId,
+        hasDocumentsInProgress,
+        loadDocuments,
+    ]);
 
     const handleToggleUploadPanel = () => {
         if (!hasActiveConversation) {
