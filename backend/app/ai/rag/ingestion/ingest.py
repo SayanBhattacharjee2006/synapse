@@ -11,6 +11,7 @@ async def ingest_document(document, file_path):
     print(f"Loaded {len(documents)} documents from {document.filename}...")
 
     for doc in documents:
+        doc.metadata.clear()
         doc.metadata.update(
             {
                 "document_id": str(document.id),

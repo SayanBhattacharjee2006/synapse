@@ -37,7 +37,10 @@ async def stream_chat(
     summary = None
 
     async for event in graph.astream_events(
-        {"messages": [HumanMessage(content=message.content)]},
+        {
+            "messages": [HumanMessage(content=message.content)],
+            "conversation_id":str(conversation_id)
+        },
         config=config,
         version="v2",
     ):

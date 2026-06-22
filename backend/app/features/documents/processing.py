@@ -6,15 +6,13 @@ from sqlalchemy import select
 from app.integretions.s3.service import download_from_s3
 from app.ai.rag.ingestion.ingest import ingest_document
 
-
 async def process_document(document_id: uuid.UUID):
     async with session_factory() as session:
         document = None
         file_path = None
         try:
             stmt = select(Document).where(
-                Document.id == document_id,
-                Document.is_deleted == False
+                Document.id == document_id, Document.is_deleted == False
             )
 
             document = (await session.scalars(stmt)).one_or_none()
@@ -34,12 +32,12 @@ async def process_document(document_id: uuid.UUID):
 
             document.processing_status = ProcessingStatusEnum.completed
             document.error_message = None
-            await session.commit() 
+            await session.commit()
 
             print(f"Document processing completed: {document.filename}")
 
         except Exception as e:
-            if document :
+            if document:
                 document.processing_status = ProcessingStatusEnum.failed
                 document.error_message = str(e)
                 await session.commit()
@@ -48,4 +46,3 @@ async def process_document(document_id: uuid.UUID):
         finally:
             if file_path and os.path.exists(file_path):
                 os.remove(file_path)
-            
