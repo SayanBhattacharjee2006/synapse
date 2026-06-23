@@ -1,17 +1,23 @@
 from app.ai.rag.retreival.retreival_service import retreive_context
-from app.ai.prompts.chat import get_summariser_prompt, get_system_prompt, get_evaluator_prompt
+from app.ai.prompts.chat import (
+    get_summariser_prompt,
+    get_system_prompt,
+    get_evaluator_prompt,
+)
 from app.ai.graph.state import GraphState
 from langchain_core.messages import SystemMessage, RemoveMessage, HumanMessage
 from langchain_core.messages.utils import count_tokens_approximately
 from app.ai.llm import llm, structured_llm
 from app.ai.schema import RouterType
+from app.integretions.taviily.tavily import search_tavily, create_search_response
+
 
 async def llm_node(state: GraphState) -> dict:
 
     system_prompt = get_system_prompt(
         summary=state.get("summary", ""),
         retrieved_context=state.get("retrieved_context", ""),
-        retrieval_found=state.get("retrieval_found", False)
+        retrieval_found=state.get("retrieval_found", False),
     )
 
     messages = [SystemMessage(content=system_prompt)] + state["messages"]
@@ -75,28 +81,23 @@ async def retreive_context_node(state: GraphState) -> dict:
     context, success = await retreive_context(
         query=query, conversation_id=str(state.get("conversation_id", ""))
     )
-    print("retrieved context", context, "\n Success: ",success)
-    return {
-        "retrieved_context": context,
-        "retrieval_found": success
-    }
+    print("retrieved context", context, "\n Success: ", success)
+    return {"retrieved_context": context, "retrieval_found": success}
 
 
 async def evaluator_node(state: GraphState) -> dict:
-    
+
     query = state["messages"][-1].content
 
     response = await structured_llm.ainvoke(
-        [
-            SystemMessage(content=get_evaluator_prompt()),
-            HumanMessage(content=query)
-        ]
+        [SystemMessage(content=get_evaluator_prompt()), HumanMessage(content=query)]
     )
 
     print("evaluator Reasoning: ", response.reasoning)
     return {
         "router": response.router,
     }
+
 
 def route_after_evaluation(state: GraphState):
     decision = state.get("router", "none")
@@ -110,5 +111,26 @@ def route_after_evaluation(state: GraphState):
     elif decision == RouterType.NONE:
         return ["llm"]
 
+
 async def web_retreival_node(state: GraphState) -> dict:
-    pass
+    try:
+        query = state["messages"][-1].content
+
+        response = await search_tavily(query)
+
+        context = create_search_response(response)
+
+        if not context:
+            return {"web_context": "", "web_found": False, "web_sources": []}
+
+        return {
+            "web_context": context,
+            "web_found": bool(response["results"]),
+            "web_sources": [result["url"] for result in response["results"]],
+        }
+    except KeyError as e:
+        print(f"Tavily response missing expected key: {e}")
+    except Exception as e:
+        print(f"Web retrieval failed for query={query!r}: {e}")
+
+    return {"web_context": "", "web_found": False, "web_sources": []}

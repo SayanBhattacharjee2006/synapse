@@ -1,5 +1,6 @@
 from langgraph.graph import MessagesState
 from app.ai.schema import RouterType
+from typing import List
 
 class GraphState(MessagesState):
     summary: str = ""
@@ -10,6 +11,7 @@ class GraphState(MessagesState):
     retrieval_found: bool = False
         
     web_context: str = ""
+    web_sources: List[str] = []
     web_found: bool = False
 
     has_uploaded_documents: bool = False

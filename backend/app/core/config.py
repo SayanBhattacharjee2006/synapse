@@ -49,6 +49,9 @@ class Settings(BaseSettings):
     RAG_CHUNK_SIZE:int
     RAG_OVERLAP:int
 
+    # Taviily
+    TAVILY_API_KEY:str
+
     @model_validator(mode="after")
     def validate_auth_settings(self):
         if self.SECRET_KEY:
