@@ -5,7 +5,7 @@ from app.ai.prompts.chat import (
     get_evaluator_prompt,
 )
 from app.ai.graph.state import GraphState
-from langchain_core.messages import SystemMessage, RemoveMessage, HumanMessage
+from langchain_core.messages import SystemMessage, RemoveMessage, HumanMessage, AIMessage
 from langchain_core.messages.utils import count_tokens_approximately
 from app.ai.llm import llm, structured_llm
 from app.ai.schema import RouterType
@@ -13,11 +13,46 @@ from app.integretions.taviily.tavily import search_tavily, create_search_respons
 
 
 async def llm_node(state: GraphState) -> dict:
+    summary=state.get("summary", "")
+    retrieved_context=state.get("retrieved_context", "")
+    retrieval_found=state.get("retrieval_found", False)
+    web_context=state.get("web_context", "")
+    web_found=state.get("web_found", False)
+    router=state.get("router", RouterType.NONE)
+
+    if router == RouterType.RAG and not retrieval_found:
+        return {
+            "messages": [
+                AIMessage(
+                    content="I could not find that information in the uploaded documents."
+                )
+            ]
+        }
+    elif router == RouterType.WEB and not web_found:
+            return {
+                "messages": [
+                    AIMessage(
+                        content="I could not find relevant information from web search."
+                    )
+                ]
+            }
+    elif router == RouterType.BOTH and not retrieval_found and not web_found:
+        return {
+            "messages": [
+                AIMessage(
+                    content="I could not find that information in the uploaded documents or relevant information from web search."
+                )
+            ]
+        }
+
 
     system_prompt = get_system_prompt(
-        summary=state.get("summary", ""),
-        retrieved_context=state.get("retrieved_context", ""),
-        retrieval_found=state.get("retrieval_found", False),
+        summary=summary,
+        retrieved_context=retrieved_context,
+        retrieval_found=retrieval_found,
+        web_context=web_context,
+        web_found=web_found,
+        router=router,
     )
 
     messages = [SystemMessage(content=system_prompt)] + state["messages"]
@@ -77,7 +112,7 @@ async def summarisation_node(state: GraphState) -> dict:
 
 async def retreive_context_node(state: GraphState) -> dict:
     query = state["messages"][-1].content
-
+    print("VECTOR RETREIVAL STARTED FOR QUERY: ", query)
     context, success = await retreive_context(
         query=query, conversation_id=str(state.get("conversation_id", ""))
     )
@@ -113,8 +148,9 @@ def route_after_evaluation(state: GraphState):
 
 
 async def web_retreival_node(state: GraphState) -> dict:
+    query = state["messages"][-1].content
+    print("WEB RETREIVAL STARTED FOR QUERY: ", query)
     try:
-        query = state["messages"][-1].content
 
         response = await search_tavily(query)
 

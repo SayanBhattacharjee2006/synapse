@@ -6,9 +6,8 @@ from app.ai.graph.nodes import (
     retreive_context_node,
     evaluator_node,
     route_after_evaluation,
-    web_retrieval_node,
+    web_retreival_node,
 )
-
 
 def get_graph(postgresCheckpointer):
     builder = StateGraph(GraphState)
@@ -16,7 +15,7 @@ def get_graph(postgresCheckpointer):
     builder.add_node("summarisation", summarisation_node)
     builder.add_node("retreiver", retreive_context_node)
     builder.add_node("evaluator", evaluator_node)
-    builder.add_node("web", web_retrieval_node)
+    builder.add_node("web", web_retreival_node)
 
     
     builder.add_edge(START, "summarisation")

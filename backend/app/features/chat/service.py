@@ -1,5 +1,6 @@
 import uuid
 import json
+from datetime import datetime
 from fastapi import Request
 from sqlalchemy import select, update
 from app.features.chat.schemas import ChatRequest
@@ -36,6 +37,8 @@ async def stream_chat(
     is_first_message = len(messages) == 1
     summary = None
 
+    print("STREAMING CHAT FOR CONVERSATION ID: ", conversation_id, " USER ID: ", user_id, " MESSAGE: ", message.content, "TIME:", datetime.now() )
+
     async for event in graph.astream_events(
         {
             "messages": [HumanMessage(content=message.content)],
@@ -53,6 +56,7 @@ async def stream_chat(
         ):
             token = event["data"]["chunk"].content
             if token:
+                print("STREAMING TOKEN: ", token, " TIME: ", datetime.now())
                 yield f"data: {token}\n\n"
 
     update_values = {}
