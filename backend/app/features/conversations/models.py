@@ -29,6 +29,7 @@ class Conversation(Base):
     updated_at: Mapped[datetime] = mapped_column(
         "updatedAt", server_default=func.now(), onupdate=func.now()
     )
+    document_count: Mapped[int] = mapped_column("documentCount", default=0)
 
     messages: Mapped[list["Message"]] = relationship(back_populates="conversation")
     user: Mapped["User"] = relationship(back_populates="conversations")

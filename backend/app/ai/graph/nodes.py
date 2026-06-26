@@ -5,7 +5,12 @@ from app.ai.prompts.chat import (
     get_evaluator_prompt,
 )
 from app.ai.graph.state import GraphState
-from langchain_core.messages import SystemMessage, RemoveMessage, HumanMessage, AIMessage
+from langchain_core.messages import (
+    SystemMessage,
+    RemoveMessage,
+    HumanMessage,
+    AIMessage,
+)
 from langchain_core.messages.utils import count_tokens_approximately
 from app.ai.llm import llm, structured_llm
 from app.ai.schema import RouterType
@@ -13,38 +18,12 @@ from app.integretions.taviily.tavily import search_tavily, create_search_respons
 
 
 async def llm_node(state: GraphState) -> dict:
-    summary=state.get("summary", "")
-    retrieved_context=state.get("retrieved_context", "")
-    retrieval_found=state.get("retrieval_found", False)
-    web_context=state.get("web_context", "")
-    web_found=state.get("web_found", False)
-    router=state.get("router", RouterType.NONE)
-
-    if router == RouterType.RAG and not retrieval_found:
-        return {
-            "messages": [
-                AIMessage(
-                    content="I could not find that information in the uploaded documents."
-                )
-            ]
-        }
-    elif router == RouterType.WEB and not web_found:
-            return {
-                "messages": [
-                    AIMessage(
-                        content="I could not find relevant information from web search."
-                    )
-                ]
-            }
-    elif router == RouterType.BOTH and not retrieval_found and not web_found:
-        return {
-            "messages": [
-                AIMessage(
-                    content="I could not find that information in the uploaded documents or relevant information from web search."
-                )
-            ]
-        }
-
+    summary = state.get("summary", "")
+    retrieved_context = state.get("retrieved_context", "")
+    retrieval_found = state.get("retrieval_found", False)
+    web_context = state.get("web_context", "")
+    web_found = state.get("web_found", False)
+    router = state.get("router", RouterType.NONE)
 
     system_prompt = get_system_prompt(
         summary=summary,
@@ -124,8 +103,12 @@ async def evaluator_node(state: GraphState) -> dict:
 
     query = state["messages"][-1].content
 
+    evaluator_prompt = get_evaluator_prompt(
+        has_uploaded_documents=state.get("has_uploaded_documents", False)
+    )
+
     response = await structured_llm.ainvoke(
-        [SystemMessage(content=get_evaluator_prompt()), HumanMessage(content=query)]
+        [SystemMessage(content=evaluator_prompt), HumanMessage(content=query)]
     )
 
     print("evaluator Reasoning: ", response.reasoning)

@@ -15,7 +15,7 @@ async def stream_chat(
     request: Request,
     conversation_id: uuid.UUID,
     message: ChatRequest,
-    db: AsyncSession,
+    db: AsyncSession,  
     user_id: uuid.UUID,
 ):
     graph = request.app.state.graph
@@ -37,12 +37,22 @@ async def stream_chat(
     is_first_message = len(messages) == 1
     summary = None
 
+    stmt = select(Conversation).where(
+        Conversation.id == conversation_id,
+        Conversation.is_deleted == False,
+        Conversation.user_id == user_id,
+    )
+
+    conversation = (await db.scalars(stmt)).one_or_none()
+
+
     print("STREAMING CHAT FOR CONVERSATION ID: ", conversation_id, " USER ID: ", user_id, " MESSAGE: ", message.content, "TIME:", datetime.now() )
 
     async for event in graph.astream_events(
         {
             "messages": [HumanMessage(content=message.content)],
-            "conversation_id":str(conversation_id)
+            "conversation_id":str(conversation_id),
+            "has_uploaded_documents": conversation.document_count > 0,
         },
         config=config,
         version="v2",

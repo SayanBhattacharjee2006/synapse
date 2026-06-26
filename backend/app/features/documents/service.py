@@ -59,7 +59,7 @@ async def upload_document(db:AsyncSession ,file: UploadFile, user_id: uuid.UUID,
 
         await upload_to_s3(file.file, key)
         
-
+        conversation.document_count += 1
         await db.commit()
         await db.refresh(document_row)
 
@@ -118,6 +118,16 @@ async def delete_document(db:AsyncSession, conversation_id: uuid.UUID, document_
         # delete document row in postgresql using sqlalchemy
         await delete_s3_obj(document.s3_key)
         document.is_deleted = True
+
+        stmt = select(Conversation).where(
+            Conversation.id == conversation_id,
+            Conversation.is_deleted == False,
+            Conversation.user_id == user_id,
+        )
+
+        conversation = (await db.scalars(stmt)).one_or_none()
+        conversation.document_count -= 1
+
         await db.commit()
 
     except HTTPException:
