@@ -148,7 +148,7 @@ def get_summariser_prompt(
 
 
 def get_evaluator_prompt(has_uploaded_documents: bool = False) -> str:
-    return """You are an expert routing classifier for an AI assistant.
+    return f"""You are an expert routing classifier for an AI assistant.
 
 Your task is to decide which retrieval strategy should be used for the user's query.
 

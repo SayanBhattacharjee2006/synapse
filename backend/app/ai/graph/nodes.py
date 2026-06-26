@@ -104,13 +104,17 @@ async def evaluator_node(state: GraphState) -> dict:
     query = state["messages"][-1].content
 
     evaluator_prompt = get_evaluator_prompt(
-        has_uploaded_documents=state.get("has_uploaded_documents", False)
+        state.get("has_uploaded_documents", False)
     )
+
+    print("EVALUATOR PROMPT: ", evaluator_prompt)
 
     response = await structured_llm.ainvoke(
         [SystemMessage(content=evaluator_prompt), HumanMessage(content=query)]
     )
 
+    print("has_uploaded_documents: ", state.get("has_uploaded_documents", False))
+    print("evaluator Router: ", response.router)
     print("evaluator Reasoning: ", response.reasoning)
     return {
         "router": response.router,

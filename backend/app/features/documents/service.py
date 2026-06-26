@@ -126,7 +126,8 @@ async def delete_document(db:AsyncSession, conversation_id: uuid.UUID, document_
         )
 
         conversation = (await db.scalars(stmt)).one_or_none()
-        conversation.document_count -= 1
+        document_count = max(conversation.document_count - 1, 0)
+        conversation.document_count = document_count
 
         await db.commit()
 
