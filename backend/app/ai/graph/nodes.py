@@ -3,6 +3,7 @@ from app.ai.prompts.chat import (
     get_summariser_prompt,
     get_system_prompt,
     get_evaluator_prompt,
+    get_query_optimizer_prompt,
 )
 from app.ai.graph.state import GraphState
 from langchain_core.messages import (
@@ -12,7 +13,7 @@ from langchain_core.messages import (
     AIMessage,
 )
 from langchain_core.messages.utils import count_tokens_approximately
-from app.ai.llm import llm, structured_llm
+from app.ai.llm import llm, structured_llm, optimized_query_llm
 from app.ai.schema import RouterType
 from app.integretions.taviily.tavily import search_tavily, create_search_response
 
@@ -90,12 +91,13 @@ async def summarisation_node(state: GraphState) -> dict:
 
 
 async def retreive_context_node(state: GraphState) -> dict:
-    query = state["messages"][-1].content
+    query = state.get("optimized_rag_query", state["messages"][-1].content)
     print("VECTOR RETREIVAL STARTED FOR QUERY: ", query)
+
     context, success = await retreive_context(
         query=query, conversation_id=str(state.get("conversation_id", ""))
     )
-    print("retrieved context", context, "\n Success: ", success)
+
     return {"retrieved_context": context, "retrieval_found": success}
 
 
@@ -103,11 +105,8 @@ async def evaluator_node(state: GraphState) -> dict:
 
     query = state["messages"][-1].content
 
-    evaluator_prompt = get_evaluator_prompt(
-        state.get("has_uploaded_documents", False)
-    )
-
-    print("EVALUATOR PROMPT: ", evaluator_prompt)
+    print("Reached evaluator node")
+    evaluator_prompt = get_evaluator_prompt(state.get("has_uploaded_documents", False))
 
     response = await structured_llm.ainvoke(
         [SystemMessage(content=evaluator_prompt), HumanMessage(content=query)]
@@ -135,7 +134,7 @@ def route_after_evaluation(state: GraphState):
 
 
 async def web_retreival_node(state: GraphState) -> dict:
-    query = state["messages"][-1].content
+    query = state.get("optimized_web_query", state["messages"][-1].content)
     print("WEB RETREIVAL STARTED FOR QUERY: ", query)
     try:
 
@@ -157,3 +156,26 @@ async def web_retreival_node(state: GraphState) -> dict:
         print(f"Web retrieval failed for query={query!r}: {e}")
 
     return {"web_context": "", "web_found": False, "web_sources": []}
+
+
+async def query_optimizer_node(state: GraphState) -> dict:
+    query = state["messages"][-1].content
+    router = state.get("router", RouterType.NONE)
+    print("Reached query optimizer node")
+    optimizer_prompt = get_query_optimizer_prompt()
+
+    response = await optimized_query_llm.ainvoke(
+        [
+            SystemMessage(content=optimizer_prompt),
+            HumanMessage(content=f"Router Decision: {router} \n user query: {query}"),
+        ]
+    )
+
+    print("optimized_rag_query: ", response.rag_query)
+    print("optimized_web_query: ", response.web_query)
+    print("reasoning: ", response.reasoning)
+
+    return {
+        "optimized_rag_query": response.rag_query,
+        "optimized_web_query": response.web_query,
+    }

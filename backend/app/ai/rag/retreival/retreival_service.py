@@ -23,8 +23,14 @@ async def retreive_context(query: str, conversation_id: str, k: int = 5):
         return "",False 
     
     best_score = docs[0][1]
+    print("BEST SCORE : ", best_score)
 
-    if best_score < 0.5:
+    for doc, score in docs:
+        print("DOC ID : ", doc.id)
+        print("SCORE : ", score)
+        print("chunk: ", doc.page_content,"\n\n")
+
+    if best_score < 0.4:
         return "",False
     
     context = create_context(docs)

@@ -7,6 +7,7 @@ from app.ai.graph.nodes import (
     evaluator_node,
     route_after_evaluation,
     web_retreival_node,
+    query_optimizer_node
 )
 
 def get_graph(postgresCheckpointer):
@@ -16,12 +17,14 @@ def get_graph(postgresCheckpointer):
     builder.add_node("retreiver", retreive_context_node)
     builder.add_node("evaluator", evaluator_node)
     builder.add_node("web", web_retreival_node)
+    builder.add_node("query_optimizer", query_optimizer_node)
 
     
     builder.add_edge(START, "summarisation")
     builder.add_edge("summarisation", "evaluator")
+    builder.add_edge("evaluator", "query_optimizer")
     builder.add_conditional_edges(
-        "evaluator", route_after_evaluation, ["retreiver", "web", "llm"]
+        "query_optimizer", route_after_evaluation, ["retreiver", "web", "llm"]
     )
     builder.add_edge("retreiver", "llm")
     builder.add_edge("web", "llm")

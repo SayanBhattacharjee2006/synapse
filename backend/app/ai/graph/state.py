@@ -16,3 +16,6 @@ class GraphState(MessagesState):
 
     has_uploaded_documents: bool = False
     router: RouterType = RouterType.NONE
+
+    optimized_rag_query: str = ""
+    optimized_web_query: str = ""
