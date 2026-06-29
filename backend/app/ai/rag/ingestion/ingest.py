@@ -3,9 +3,7 @@ import asyncio
 from app.ai.rag.ingestion.loaders.factory import load_document
 from app.ai.rag.ingestion.chunking import split_documents
 from app.ai.rag.embeddings import (
-    dense_embeddings,
-    embed_late_interaction_documents,
-    embed_sparse_documents,
+    embed_chunks_in_batches,
 )
 
 from app.core.config import settings
@@ -40,11 +38,7 @@ async def ingest_document(document, file_path):
 
     print(f"Embedding {len(texts)} chunks (dense + multi + late) ...")
 
-    dense_vectors = await dense_embeddings.aembed_documents(texts)
-
-    sparse_vectors = await asyncio.to_thread(embed_sparse_documents, texts)
-    
-    multi_vectors = await asyncio.to_thread(embed_late_interaction_documents, texts)
+    dense_vectors, sparse_vectors, multi_vectors = await embed_chunks_in_batches(texts, batch_size=32)
 
     points = [
         models.PointStruct(
