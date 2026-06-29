@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 from app.ai.rag.vectorStore import get_summary_vector_store
 from langchain_core.documents import Document
 
-def store_summary(summary:str, conversationId: uuid.UUID, user_id: uuid.UUID )-> None:
+async def store_summary(summary:str, conversationId: uuid.UUID, user_id: uuid.UUID )-> None:
     document = Document(
         page_content=summary,
         metadata={
@@ -13,4 +13,4 @@ def store_summary(summary:str, conversationId: uuid.UUID, user_id: uuid.UUID )->
         }
     )
 
-    get_summary_vector_store().add_documents([document])
+    await get_summary_vector_store().add_documents([document])

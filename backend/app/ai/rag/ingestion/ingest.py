@@ -1,13 +1,22 @@
+import uuid
+import asyncio
 from app.ai.rag.ingestion.loaders.factory import load_document
 from app.ai.rag.ingestion.chunking import split_documents
-from app.ai.rag.vectorStore import get_document_vector_store
+from app.ai.rag.embeddings import (
+    dense_embeddings,
+    embed_late_interaction_documents,
+    embed_sparse_documents,
+)
+
+from app.core.config import settings
+from qdrant_client import models
 
 
 async def ingest_document(document, file_path):
     print(f"Ingesting document {document.filename}...")
 
     documents = await load_document(file_path)
-    
+
     print(f"Loaded {len(documents)} documents from {document.filename}...")
 
     for doc in documents:
@@ -27,8 +36,41 @@ async def ingest_document(document, file_path):
 
     print(f"Split {len(documents)} documents into {len(text_chunks)} chunks...")
 
-    vector_store = get_document_vector_store()
+    texts = [chunk.page_content for chunk in text_chunks]
 
-    print(f"Adding {len(text_chunks)} chunks to vector store...")
+    print(f"Embedding {len(texts)} chunks (dense + multi + late) ...")
 
-    await vector_store.aadd_documents(text_chunks)
+    dense_vectors = await dense_embeddings.aembed_documents(texts)
+
+    sparse_vectors = await asyncio.to_thread(embed_sparse_documents, texts)
+    
+    multi_vectors = await asyncio.to_thread(embed_late_interaction_documents, texts)
+
+    points = [
+        models.PointStruct(
+            id=str(uuid.uuid4()),
+            vector={
+                "dense": dense_vectors[i],
+                "sparse": models.SparseVector(
+                    indices=sparse_vectors[i].indices.tolist(),
+                    values=sparse_vectors[i].values.tolist(),
+                ),
+                "multi": multi_vectors[i].tolist(),
+            },
+            payload={
+                "page_content": text_chunks[i].page_content,
+                **text_chunks[i].metadata,
+            }
+        )
+        for i in range(len(text_chunks))
+    ]
+
+    print(f"Upserting {len(points)} chunks to Qdrant...")
+
+    await client.upsert(
+        collection_name=settings.QDRANT_DOCUMENTS_COLLECTION,
+        points=points,
+        batch_size=25,
+    )
+
+    print(f"Ingestion of {document.filename} completed...")

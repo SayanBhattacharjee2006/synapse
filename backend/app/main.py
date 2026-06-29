@@ -18,7 +18,7 @@ origins = [
 @asynccontextmanager
 async def lifespan(app: FastAPI):
 
-    create_collections()
+    await create_collections()
 
     async with AsyncPostgresSaver.from_conn_string(str(settings.DATABASE_URL).replace("+asyncpg", "")) as checkpoint_saver:
         await checkpoint_saver.setup()

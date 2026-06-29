@@ -113,7 +113,7 @@ async def delete_document(db:AsyncSession, conversation_id: uuid.UUID, document_
 
     try:
 
-        delete_document_chunks(document_id)
+        await delete_document_chunks(document_id)
 
         # delete document row in postgresql using sqlalchemy
         await delete_s3_obj(document.s3_key)

@@ -100,7 +100,7 @@ async def stream_chat(
     await db.commit()
 
     if summary:
-        store_summary(summary, conversation_id, user_id)
+        await store_summary(summary, conversation_id, user_id)
 
     if is_first_message:
         yield f"event: title\ndata: {json.dumps({'title': title})}\n\n"

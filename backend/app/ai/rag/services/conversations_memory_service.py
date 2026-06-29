@@ -3,7 +3,7 @@ from app.features.conversations.models import Message
 from langchain_core.documents import Document
 import uuid
 
-def store_message(message: Message, user_id: uuid.UUID )-> None:
+async def store_message(message: Message, user_id: uuid.UUID )-> None:
     document = Document(
         page_content=message.content,
         metadata={
@@ -15,4 +15,4 @@ def store_message(message: Message, user_id: uuid.UUID )-> None:
         },
     )
 
-    get_conversation_vector_store().add_documents([document])
+    await get_conversation_vector_store().aadd_documents([document])

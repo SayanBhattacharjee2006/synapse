@@ -169,6 +169,6 @@ async def create_message(
     await db.commit()
     await db.refresh(message)
 
-    store_message(message, user_id)
+    await store_message(message, user_id)
 
     return message
