@@ -17,7 +17,7 @@ import uuid
 from app.core.database import Base
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.dialects.postgresql import UUID
-from sqlalchemy import func, ForeignKey, Enum, String, Integer
+from sqlalchemy import func, ForeignKey, Enum, String, Integer, Text
 from datetime import datetime
 
 
@@ -42,17 +42,23 @@ class Document(Base):
 
     filename: Mapped[str] = mapped_column(String(255), nullable=False)
 
-    mime_type: Mapped[str] = mapped_column(String(255), nullable=False)
+    mime_type: Mapped[str] = mapped_column("mimeType",String(255), nullable=False)
 
-    file_size: Mapped[int] = mapped_column(Integer, nullable=False)
+    file_size: Mapped[int] = mapped_column("fileSize",Integer, nullable=False)
 
-    s3_key: Mapped[str] = mapped_column(String(255), nullable=False, unique=True)
+    s3_key: Mapped[str] = mapped_column("s3Key", String(255), nullable=False, unique=True)
 
     processing_status: Mapped[ProcessingStatusEnum] = mapped_column(Enum(ProcessingStatusEnum), nullable=False, default=ProcessingStatusEnum.pending)
 
     error_message: Mapped[str | None] = mapped_column(String(255), nullable=True)
 
     is_deleted: Mapped[bool] = mapped_column("isDeleted", default=False)
+
+    summary: Mapped[str | None] = mapped_column(Text, nullable=True)
+    
+    summary_status: Mapped[ProcessingStatusEnum] = mapped_column("summaryStatus",Enum(ProcessingStatusEnum), nullable=False, default=ProcessingStatusEnum.pending)
+
+    summary_generated_at: Mapped[datetime | None] = mapped_column("summaryGeneratedAt", nullable=True)
 
     created_at: Mapped[datetime] = mapped_column("createdAt", server_default=func.now())
 

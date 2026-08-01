@@ -26,6 +26,12 @@ async def llm_node(state: GraphState) -> dict:
     web_found = state.get("web_found", False)
     router = state.get("router", RouterType.NONE)
 
+    print("Reached llm node")   
+    print("\n\n WEB CONTEXT: ", web_context)
+    print("\n\n RETREIVER CONTEXT: ", retrieved_context)
+
+
+
     system_prompt = get_system_prompt(
         summary=summary,
         retrieved_context=retrieved_context,
@@ -141,20 +147,27 @@ async def web_retreival_node(state: GraphState) -> dict:
         response = await search_tavily(query)
 
         context = create_search_response(response)
-
+        print("**************************************\nWEB RESPONSE: ", response,"\n************************************\n")
         if not context:
             return {"web_context": "", "web_found": False, "web_sources": []}
-
-        return {
-            "web_context": context,
-            "web_found": bool(response["results"]),
-            "web_sources": [result["url"] for result in response["results"]],
-        }
+        if state.get("router", RouterType.NONE) == RouterType.BOTH:
+            return {
+                "web_context": context,
+                "web_found": bool(response["results"]),
+                "web_sources": [result["url"] for result in response["results"]],
+            }
+        else:
+            return {
+                "web_context": context,
+                "web_found": bool(response["results"]),
+                "web_sources": [],
+                "retrieved_context": context,
+                "retrieval_found": False,
+            }
     except KeyError as e:
         print(f"Tavily response missing expected key: {e}")
     except Exception as e:
         print(f"Web retrieval failed for query={query!r}: {e}")
-
     return {"web_context": "", "web_found": False, "web_sources": []}
 
 

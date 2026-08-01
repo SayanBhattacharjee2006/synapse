@@ -5,10 +5,9 @@ from app.ai.rag.ingestion.chunking import split_documents
 from app.ai.rag.embeddings import (
     embed_chunks_in_batches,
 )
-
 from app.core.config import settings
 from qdrant_client import models
-
+from app.ai.rag.client import client
 
 async def ingest_document(document, file_path):
     print(f"Ingesting document {document.filename}...")
@@ -38,7 +37,7 @@ async def ingest_document(document, file_path):
 
     print(f"Embedding {len(texts)} chunks (dense + multi + late) ...")
 
-    dense_vectors, sparse_vectors, multi_vectors = await embed_chunks_in_batches(texts, batch_size=32)
+    dense_vectors, sparse_vectors, multi_vectors = await embed_chunks_in_batches(texts, 32)
 
     points = [
         models.PointStruct(
@@ -61,10 +60,12 @@ async def ingest_document(document, file_path):
 
     print(f"Upserting {len(points)} chunks to Qdrant...")
 
-    await client.upsert(
-        collection_name=settings.QDRANT_DOCUMENTS_COLLECTION,
-        points=points,
-        batch_size=25,
-    )
+    BATCH_SIZE = 25
+
+    for i in range(0, len(points), BATCH_SIZE):
+        await client.upsert(
+            collection_name=settings.QDRANT_DOCUMENTS_COLLECTION,
+            points=points[i:i + BATCH_SIZE],
+        )
 
     print(f"Ingestion of {document.filename} completed...")
