@@ -11,3 +11,4 @@ class DocumentResponse(BaseModel):
     mime_type: str
     file_size: int
     processing_status : ProcessingStatusEnum 
+
