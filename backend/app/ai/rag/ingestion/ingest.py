@@ -1,5 +1,4 @@
 import uuid
-import asyncio
 from app.ai.rag.ingestion.loaders.factory import load_document
 from app.ai.rag.ingestion.chunking import split_documents
 from app.ai.rag.embeddings import (

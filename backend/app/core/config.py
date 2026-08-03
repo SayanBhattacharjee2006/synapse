@@ -52,6 +52,8 @@ class Settings(BaseSettings):
     # Taviily
     TAVILY_API_KEY:str
 
+    SUMMARY_CHUNK_GROUPING_THRESHOLD:int
+
     @model_validator(mode="after")
     def validate_auth_settings(self):
         if self.SECRET_KEY:

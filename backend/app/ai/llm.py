@@ -1,6 +1,8 @@
 from app.core.config import settings
 from langchain_openai import ChatOpenAI
 from app.ai.schema import EvaluatorResponseSchema, OptimizedQueryResponse
+from app.features.documents.summary.schemas import IntermediateSummary
+
 llm = ChatOpenAI(
         api_key=settings.OPENAI_API_KEY,
         model="gpt-4o-mini", 
@@ -12,3 +14,5 @@ llm = ChatOpenAI(
 structured_llm = llm.with_structured_output(EvaluatorResponseSchema)
 
 optimized_query_llm = llm.with_structured_output(OptimizedQueryResponse)
+
+mapper_llm = llm.with_structured_output(IntermediateSummary)
