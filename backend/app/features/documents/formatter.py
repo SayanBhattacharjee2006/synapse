@@ -1,3 +1,4 @@
+from app.features.documents.summary.schemas import IntermediateSummary
 from app.features.documents.summary.schemas import DocumentProfile
 from langchain_core.documents import Document
 
@@ -19,4 +20,14 @@ def group_serializer(chunk_group: list[Document])-> str:
 
 
 
-        
+def summary_serializer(intermediate_summaries: list[IntermediateSummary]) -> str:
+    serialized_parts = []
+    if len(intermediate_summaries) == 1:
+        serialized_parts.append(f"The Final Intermediate Summary: .\n")
+    else:
+        serialized_parts.append(f"The following summary section consists of {len(intermediate_summaries)} consecutive summaries extracted from the same document.\n")
+    for idx, summary in enumerate(intermediate_summaries):
+        serialized_parts.append(f"========Summary {idx + 1}=========\n{summary.summary}\n")
+
+    return "".join(serialized_parts)
+

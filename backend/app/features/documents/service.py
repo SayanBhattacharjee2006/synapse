@@ -1,4 +1,6 @@
+import time
 import uuid
+from datetime import datetime, timezone
 from fastapi import UploadFile, HTTPException
 from app.integretions.s3.constants import ALLOWED_EXTENSIONS
 from sqlalchemy import select
@@ -8,6 +10,8 @@ from app.features.documents.model import Document
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.features.conversations.models import Conversation
 from app.ai.rag.services.document_memory_service import delete_document_chunks
+from app.features.documents.summary.schemas import DocumentProfile
+from app.features.documents.model import ProcessingStatusEnum
 
 async def upload_document(db:AsyncSession ,file: UploadFile, user_id: uuid.UUID,conversation_id: uuid.UUID):
     # extension validation
@@ -138,3 +142,36 @@ async def delete_document(db:AsyncSession, conversation_id: uuid.UUID, document_
     except Exception as e:
         await db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
+    
+
+async def update_document_profile(db:AsyncSession, conversation_id: uuid.UUID, document_id: uuid.UUID, user_id: uuid.UUID, document_profile: DocumentProfile):
+    stmt = select(Document).where(
+        Document.id == document_id,
+        Document.is_deleted == False,
+        Document.user_id == user_id,
+        Document.conversation_id == conversation_id,
+    )
+
+    document = (await db.scalars(stmt)).one_or_none()
+
+    if document is None:
+        raise HTTPException(status_code=404, detail="Document not found")
+
+    try:
+        # Update the document profile
+        document.summary = document_profile.summary
+        document.topics = document_profile.topics
+
+        await db.commit()
+        await db.refresh(document)
+
+        return document
+
+    except HTTPException:
+        await db.rollback()
+        raise
+
+    except Exception as e:
+        await db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    

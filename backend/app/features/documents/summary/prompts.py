@@ -344,6 +344,12 @@ Optimize for information preservation rather than readability.
 
 ---
 
+### Input
+
+{input_text}
+
+---
+
 ## Examples
 
 ### Input
@@ -469,6 +475,12 @@ Someone reading only this summary should understand:
 - its important conclusions
 
 without requiring access to the original document.
+
+---
+
+#input
+
+{input_text}
 
 ---
 

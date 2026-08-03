@@ -42,3 +42,6 @@ async def create_collections():
                 "sparse": models.SparseVectorParams(modifier=models.Modifier.IDF)
             }
         )
+
+
+        
