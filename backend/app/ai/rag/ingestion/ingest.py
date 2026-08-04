@@ -7,8 +7,14 @@ from app.ai.rag.embeddings import (
 from app.core.config import settings
 from qdrant_client import models
 from app.ai.rag.client import client
+from langchain_core.documents import Document as LangchainDocument
+from app.features.documents.model import Document as ModelDocument
 
-async def ingest_document(document, file_path):
+
+async def load_and_chunk_document(
+    document: ModelDocument, file_path: str
+) -> list[LangchainDocument]:
+
     print(f"Ingesting document {document.filename}...")
 
     documents = await load_document(file_path)
@@ -29,14 +35,20 @@ async def ingest_document(document, file_path):
     print(f"Added document metadata to {len(documents)} documents...")
 
     text_chunks = await split_documents(documents)
-
     print(f"Split {len(documents)} documents into {len(text_chunks)} chunks...")
+
+    return text_chunks
+
+
+async def ingest_document(text_chunks: list[LangchainDocument]) -> None:
 
     texts = [chunk.page_content for chunk in text_chunks]
 
     print(f"Embedding {len(texts)} chunks (dense + multi + late) ...")
 
-    dense_vectors, sparse_vectors, multi_vectors = await embed_chunks_in_batches(texts, 32)
+    dense_vectors, sparse_vectors, multi_vectors = await embed_chunks_in_batches(
+        texts, 32
+    )
 
     points = [
         models.PointStruct(
@@ -52,7 +64,7 @@ async def ingest_document(document, file_path):
             payload={
                 "page_content": text_chunks[i].page_content,
                 **text_chunks[i].metadata,
-            }
+            },
         )
         for i in range(len(text_chunks))
     ]
@@ -64,7 +76,7 @@ async def ingest_document(document, file_path):
     for i in range(0, len(points), BATCH_SIZE):
         await client.upsert(
             collection_name=settings.QDRANT_DOCUMENTS_COLLECTION,
-            points=points[i:i + BATCH_SIZE],
+            points=points[i : i + BATCH_SIZE],
         )
 
-    print(f"Ingestion of {document.filename} completed...")
+    print(f"Upserted {len(points)} chunks to Qdrant...")

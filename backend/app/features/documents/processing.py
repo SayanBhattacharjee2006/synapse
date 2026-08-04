@@ -1,11 +1,12 @@
 import uuid
 import os
+import asyncio
 from app.core.database import session_factory
 from app.features.documents.model import Document, ProcessingStatusEnum
 from sqlalchemy import select
 from app.integretions.s3.service import download_from_s3
-from app.ai.rag.ingestion.ingest import ingest_document
-
+from app.ai.rag.ingestion.ingest import ingest_document, load_and_chunk_document
+from app.features.documents.summary.service import execute_doc_summary_pipeline
 async def process_document(document_id: uuid.UUID):
     async with session_factory() as session:
         document = None
@@ -28,7 +29,12 @@ async def process_document(document_id: uuid.UUID):
 
             file_path = download_from_s3(s3_key)
 
-            await ingest_document(document, file_path)
+            text_chunks = await load_and_chunk_document(document, file_path)
+
+            await asyncio.gather(
+                ingest_document(text_chunks),
+                execute_doc_summary_pipeline(text_chunks, document_id, document.conversation_id, document.user_id),
+            )
 
             document.processing_status = ProcessingStatusEnum.completed
             document.error_message = None

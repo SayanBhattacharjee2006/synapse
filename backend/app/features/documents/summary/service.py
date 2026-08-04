@@ -2,7 +2,6 @@ import asyncio
 import uuid
 from langchain_core.documents import Document
 from datetime import datetime, timezone
-from sqlalchemy.ext.asyncio import AsyncSession
 from app.features.documents.summary.schemas import IntermediateSummary, DocumentProfile
 from app.features.documents.summary.mapper import summarize_group
 from app.features.documents.summary.reducer import intermediate_reducer, final_reducer
