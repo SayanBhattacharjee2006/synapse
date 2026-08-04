@@ -13,17 +13,19 @@ from app.ai.rag.services.document_memory_service import delete_document_chunks
 from app.features.documents.summary.schemas import DocumentProfile
 from app.features.documents.model import ProcessingStatusEnum
 
-async def upload_document(db:AsyncSession ,file: UploadFile, user_id: uuid.UUID,conversation_id: uuid.UUID):
+
+async def upload_document(
+    db: AsyncSession, file: UploadFile, user_id: uuid.UUID, conversation_id: uuid.UUID
+):
     # extension validation
     if file.filename is None:
-        raise HTTPException(status_code=400, detail="File name is required") 
+        raise HTTPException(status_code=400, detail="File name is required")
     ext = file.filename.rsplit(".", 1)[-1].lower()
     if ext not in ALLOWED_EXTENSIONS:
         raise HTTPException(status_code=400, detail="Invalid file type")
 
     if file.size is not None and file.size > settings.MAX_FILE_SIZE:
         raise HTTPException(status_code=400, detail="File size too large")
-    
 
     stmt = select(Conversation).where(
         Conversation.id == conversation_id,
@@ -36,13 +38,14 @@ async def upload_document(db:AsyncSession ,file: UploadFile, user_id: uuid.UUID,
     if conversation is None:
         raise HTTPException(status_code=404, detail="Conversation not found")
 
-
     try:
         # Create document row in postgresql using sqlalchemy
         document_id = uuid.uuid4()
         # generate the s3 key
 
-        key = generate_s3_key(str(user_id),str(conversation_id),str(document_id),file.filename)
+        key = generate_s3_key(
+            str(user_id), str(conversation_id), str(document_id), file.filename
+        )
 
         document_row = Document(
             id=document_id,
@@ -51,18 +54,17 @@ async def upload_document(db:AsyncSession ,file: UploadFile, user_id: uuid.UUID,
             file_size=file.size or 0,
             user_id=user_id,
             conversation_id=conversation_id,
-            s3_key=key
+            s3_key=key,
         )
 
         db.add(document_row)
-        await db.flush() #forces SQLAlchemy to execute pending SQL statements immediately
-        # by default the processing status is pending 
-        
+        await db.flush()  # forces SQLAlchemy to execute pending SQL statements immediately
+        # by default the processing status is pending
 
         # upload to s3
 
         await upload_to_s3(file.file, key)
-        
+
         conversation.document_count += 1
         await db.commit()
         await db.refresh(document_row)
@@ -77,7 +79,10 @@ async def upload_document(db:AsyncSession ,file: UploadFile, user_id: uuid.UUID,
         await db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
 
-async def get_document(db: AsyncSession, conversation_id: uuid.UUID, user_id: uuid.UUID):
+
+async def get_document(
+    db: AsyncSession, conversation_id: uuid.UUID, user_id: uuid.UUID
+):
 
     stmt = select(Conversation).where(
         Conversation.id == conversation_id,
@@ -90,7 +95,6 @@ async def get_document(db: AsyncSession, conversation_id: uuid.UUID, user_id: uu
     if conversation is None:
         raise HTTPException(status_code=404, detail="Conversation not found")
 
-
     stmt = select(Document).where(
         Document.conversation_id == conversation_id,
         Document.is_deleted == False,
@@ -101,7 +105,13 @@ async def get_document(db: AsyncSession, conversation_id: uuid.UUID, user_id: uu
 
     return documents
 
-async def delete_document(db:AsyncSession, conversation_id: uuid.UUID, document_id: uuid.UUID, user_id: uuid.UUID):
+
+async def delete_document(
+    db: AsyncSession,
+    conversation_id: uuid.UUID,
+    document_id: uuid.UUID,
+    user_id: uuid.UUID,
+):
 
     stmt = select(Document).where(
         Document.id == document_id,
@@ -142,14 +152,52 @@ async def delete_document(db:AsyncSession, conversation_id: uuid.UUID, document_
     except Exception as e:
         await db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
-    
 
-async def update_document_profile(db:AsyncSession, conversation_id: uuid.UUID, document_id: uuid.UUID, user_id: uuid.UUID, document_profile: DocumentProfile):
+
+async def update_document_profile(
+    doc: Document,
+    document_profile: DocumentProfile,
+):
+    
+    # Update the document profile
+    doc.summary = document_profile.summary
+    doc.topics = document_profile.topics
+
+
+    return doc
+
+
+async def update_doc_summary_status(
+    doc: Document,
+    status: ProcessingStatusEnum,
+    generated_time: datetime | None = None,
+):
+
+    doc.summary_status = status
+    if generated_time:
+        doc.summary_generated_at = generated_time
+
+    return doc
+
+
+
+async def get_document(db: AsyncSession, conversation_id: uuid.UUID, user_id: uuid.UUID, document_id: uuid.UUID):
+    stmt = select(Conversation).where(
+        Conversation.id == conversation_id,
+        Conversation.is_deleted == False,
+        Conversation.user_id == user_id,
+    )
+
+    conversation = (await db.scalars(stmt)).one_or_none()
+
+    if conversation is None:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+
     stmt = select(Document).where(
-        Document.id == document_id,
+        Document.conversation_id == conversation_id,
         Document.is_deleted == False,
         Document.user_id == user_id,
-        Document.conversation_id == conversation_id,
+        Document.id == document_id
     )
 
     document = (await db.scalars(stmt)).one_or_none()
@@ -157,21 +205,4 @@ async def update_document_profile(db:AsyncSession, conversation_id: uuid.UUID, d
     if document is None:
         raise HTTPException(status_code=404, detail="Document not found")
 
-    try:
-        # Update the document profile
-        document.summary = document_profile.summary
-        document.topics = document_profile.topics
-
-        await db.commit()
-        await db.refresh(document)
-
-        return document
-
-    except HTTPException:
-        await db.rollback()
-        raise
-
-    except Exception as e:
-        await db.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
-    
+    return document

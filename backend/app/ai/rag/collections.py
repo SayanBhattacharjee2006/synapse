@@ -43,5 +43,19 @@ async def create_collections():
             }
         )
 
+    if not await client.collection_exists(settings.QDRANT_DOCUMENT_SUMMARY_COLLECTION):
+
+        await client.create_collection(
+            collection_name=settings.QDRANT_DOCUMENT_SUMMARY_COLLECTION,
+            vectors_config={
+                "dense": models.VectorParams(
+                    size=1536, distance=Distance.COSINE
+                )
+            },
+            sparse_vectors_config={
+                "sparse": models.SparseVectorParams(modifier=models.Modifier.IDF)
+            }
+
+        )
 
         
