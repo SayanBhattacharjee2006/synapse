@@ -1,5 +1,5 @@
 from langchain_core.documents import Document
-from app.features.documents.summary.tiktoken import count_tokens
+from app.features.documents.summary.tiktoken import get_token_count
 from langchain_core.documents import Document
 from app.features.documents.summary.schemas import IntermediateSummary
 
@@ -10,7 +10,7 @@ def group_by_tokens(items: list[Document] | list[IntermediateSummary], text_extr
     groups: list[list[Document]] | list[list[IntermediateSummary]] = []
 
     for item in items:
-        chunk_token_count = count_tokens(text_extractore(item))
+        chunk_token_count = get_token_count(text_extractore(item))
 
         if current_token_count + chunk_token_count > threshold:    
             if current_group:

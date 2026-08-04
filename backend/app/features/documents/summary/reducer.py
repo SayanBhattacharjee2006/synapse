@@ -15,6 +15,8 @@ from app.features.documents.summary.schemas import DocumentProfile
 async def intermediate_reducer(
     intermediate_summaries: list[IntermediateSummary],
 ) -> IntermediateSummary:
+
+    print("Reached intermediate_reducer function")
     combined_summary = summary_serializer(intermediate_summaries)
 
     prompt = get_intermediate_reducer_prompt(combined_summary)
@@ -25,6 +27,8 @@ async def intermediate_reducer(
 
 
 async def final_reducer(intermediate_summary: IntermediateSummary) -> DocumentProfile:
+    print("Reached final_reducer function")
+
     serialized_summary = summary_serializer([intermediate_summary])
 
     prompt = get_final_reducer_prompt(serialized_summary)

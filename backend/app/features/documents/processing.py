@@ -31,9 +31,11 @@ async def process_document(document_id: uuid.UUID):
 
             text_chunks = await load_and_chunk_document(document, file_path)
 
+            print(f"\n FROM PROCESSING FUNCTION: {document} \n")
+
             await asyncio.gather(
                 ingest_document(text_chunks),
-                execute_doc_summary_pipeline(text_chunks, document_id, document.conversation_id, document.user_id),
+                execute_doc_summary_pipeline(text_chunks, document.id, document.conversation_id, document.user_id),
             )
 
             document.processing_status = ProcessingStatusEnum.completed

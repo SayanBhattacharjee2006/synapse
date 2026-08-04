@@ -55,7 +55,7 @@ class Document(Base):
         Enum(ProcessingStatusEnum), nullable=False, default=ProcessingStatusEnum.pending
     )
 
-    error_message: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    error_message: Mapped[str | None] = mapped_column("errorMessage", Text, nullable=True)
 
     is_deleted: Mapped[bool] = mapped_column("isDeleted", default=False)
 

@@ -181,7 +181,7 @@ async def update_doc_summary_status(
 
 
 
-async def get_document(db: AsyncSession, conversation_id: uuid.UUID, user_id: uuid.UUID, document_id: uuid.UUID):
+async def get_document_by_id(db: AsyncSession, conversation_id: uuid.UUID, user_id: uuid.UUID, document_id: uuid.UUID):
     stmt = select(Conversation).where(
         Conversation.id == conversation_id,
         Conversation.is_deleted == False,

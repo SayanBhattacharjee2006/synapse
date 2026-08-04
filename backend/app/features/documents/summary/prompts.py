@@ -227,7 +227,7 @@ def get_mapper_prompt(input_text: str) -> str:
 
     ### Input
 
-    Python supports dictionaries. A dictionary stores key-value pairs. For example, {"name": "Alice"} maps the key "name" to the value "Alice". Dictionaries provide efficient key-based lookups.
+    Python supports dictionaries. A dictionary stores key-value pairs. For example, {{"name": "Alice"}} maps the key "name" to the value "Alice". Dictionaries provide efficient key-based lookups.
 
     ### Output
 
