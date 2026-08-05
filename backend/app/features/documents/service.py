@@ -10,6 +10,7 @@ from app.features.documents.model import Document
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.features.conversations.models import Conversation
 from app.ai.rag.services.document_memory_service import delete_document_chunks
+from app.ai.rag.services.document_summary_service import delete_document_summary
 from app.features.documents.summary.schemas import DocumentProfile
 from app.features.documents.model import ProcessingStatusEnum
 
@@ -128,6 +129,8 @@ async def delete_document(
     try:
 
         await delete_document_chunks(document_id)
+
+        await delete_document_summary(document_id)
 
         # delete document row in postgresql using sqlalchemy
         await delete_s3_obj(document.s3_key)

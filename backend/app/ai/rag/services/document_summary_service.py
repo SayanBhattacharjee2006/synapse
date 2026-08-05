@@ -1,3 +1,4 @@
+import uuid
 import asyncio
 from app.core.config import settings
 from app.features.documents.summary.schemas import DocumentProfile
@@ -39,4 +40,13 @@ async def store_document_summary(doc: Document,document_profile: DocumentProfile
                 }
             )
         ]
+    )
+
+
+async def delete_document_summary(document_id: uuid.UUID):
+    await client.delete(
+        collection_name=settings.QDRANT_DOCUMENT_SUMMARY_COLLECTION,
+        points_selector=models.PointIdsList(
+            points=[str(document_id)]
+        )
     )

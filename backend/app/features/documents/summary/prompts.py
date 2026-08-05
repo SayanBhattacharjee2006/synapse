@@ -1,533 +1,575 @@
+
 def get_mapper_prompt(input_text: str) -> str:
-
     return f"""
-    You are the Mapper stage of a multi-stage Map-Reduce document summarization pipeline.
+You are the Mapper stage of a hierarchical document summarization pipeline.
 
-    ## Context
+ROLE
+You receive ONE consecutive section of a document.
 
-    The input you receive is only one section of a much larger document.
+This is NOT the final summarization stage.
 
-    Your output will NEVER be shown directly to end users.
+Your summary will later be merged with summaries from other document sections.
 
-    Instead, your summary will be consumed by another language model called the Reducer, whose responsibility is to summarize the complete document.
+Therefore your primary objective is INFORMATION RETENTION.
 
-    Therefore, your goal is NOT to create the shortest or most readable summary.
+Compress wording, NOT knowledge.
 
-    Your goal is to create a loss-minimized intermediate representation that preserves all information necessary for the Reducer while removing unnecessary redundancy.
+--------------------------------------------------
+WHAT TO PRESERVE
+--------------------------------------------------
 
-    If you are uncertain whether some information is important, preserve it rather than omit it.
+Always preserve:
 
-    ---
+• Main ideas
+• Technical concepts
+• Definitions
+• Important terminology
+• Algorithms
+• Architectures
+• Mathematical ideas
+• Experimental setup
+• Results
+• Hyperparameters
+• Important numbers
+• Examples that help understanding
+• Relationships between concepts
 
-    ## Instructions
+--------------------------------------------------
+WHAT TO REMOVE
+--------------------------------------------------
 
-    Follow these rules carefully.
+Remove only:
 
-    ### 1. Preserve Important Information
+• Repeated sentences
+• Filler
+• Unnecessary explanations
+• Redundant wording
 
-    Preserve:
+Never remove important technical information.
 
-    - Facts
-    - Definitions
-    - Concepts
-    - Relationships
-    - Procedures
-    - Algorithms
-    - Technical details
-    - Important terminology
-    - Important numbers
-    - Names
-    - Conclusions
+--------------------------------------------------
+GOOD EXAMPLES
+--------------------------------------------------
 
-    ---
+Example 1
 
-    ### 2. Remove Redundancy
+Input
 
-    Remove:
+"The Transformer replaces recurrent layers with self-attention.
+Self-attention allows every token to attend to every other token.
+Multi-head attention enables the model to capture different relationships simultaneously."
 
-    - Repeated explanations
-    - Duplicate statements
-    - Repeated examples
-    - Unnecessary filler sentences
+Good Summary
 
-    Keep only one concise version of repeated information.
+"The Transformer replaces recurrent networks with self-attention, allowing every token to attend to every other token. Multi-head attention captures multiple relationships simultaneously."
 
-    ---
+--------------------------------------------------
 
-    ### 3. Preserve Relationships
+Example 2
 
-    Maintain logical relationships between ideas.
+Input
 
-    Do NOT convert connected concepts into disconnected fragments.
+"Vector embeddings are dense numerical representations.
+Cosine similarity is commonly used to compare embeddings.
+Embedding models are trained using contrastive learning."
 
-    The Reducer should still understand how ideas relate to each other.
+Good Summary
 
-    ---
+"Vector embeddings are dense numerical representations of text. Similarity between embeddings is commonly measured using cosine similarity. Embedding models are typically trained with contrastive learning."
 
-    ### 4. Preserve Technical Accuracy
+--------------------------------------------------
 
-    Keep:
+Example 3
 
-    - Technical terminology
-    - Algorithm names
-    - Formula names
-    - Protocol names
-    - Framework names
-    - Important identifiers
+Input
 
-    Do not replace technical terms with simplified wording.
+"The experiment used Adam with learning rate 0.0001.
+Training ran for 30 epochs.
+Batch size was 64.
+Validation accuracy reached 95.2%."
 
-    ---
+Good Summary
 
-    ### 5. Preserve Context
+"The model was trained using Adam (learning rate 0.0001) for 30 epochs with batch size 64, achieving 95.2% validation accuracy."
 
-    Summaries should remain self-contained.
+--------------------------------------------------
 
-    Avoid producing isolated statements that lose surrounding context.
+Example 4
 
-    ---
+Input
 
-    ### 6. Examples
+"The paper first introduces Retrieval-Augmented Generation.
+It then explains vector databases.
+Finally it describes hybrid search."
 
-    Keep examples ONLY if they explain an important concept.
+Good Summary
 
-    Remove examples that merely repeat an already understood idea.
+"The section introduces Retrieval-Augmented Generation, explains vector databases, and describes hybrid search."
 
-    ---
+--------------------------------------------------
 
-    ### 7. Never Hallucinate
+Example 5
 
-    Never:
+Input
 
-    - invent information
-    - infer missing facts
-    - add external knowledge
-    - make assumptions
+"The API authenticates users using JWT.
+Every request passes through middleware.
+Invalid tokens return HTTP 401."
 
-    Only summarize information explicitly present in the provided text.
+Good Summary
 
-    ---
+"The API authenticates requests using JWT middleware, rejecting invalid tokens with HTTP 401."
 
-    ### 8. Do NOT Perform Document-Level Reasoning
+--------------------------------------------------
 
-    Do NOT:
+Example 6
 
-    - generate document topics
-    - identify document purpose
-    - infer audience
-    - generate keywords
-    - produce document metadata
-    - write a conclusion for the entire document
+Input
 
-    These responsibilities belong to the Reducer.
+"The cache stores frequently accessed embeddings.
+Redis reduces repeated embedding generation.
+This improves latency."
 
-    ---
+Good Summary
 
-    ### 9. Optimize for Information Preservation
+"Redis caches frequently accessed embeddings, preventing repeated embedding generation and reducing latency."
 
-    Do NOT optimize for:
+--------------------------------------------------
 
-    - readability
-    - elegance
-    - human presentation
+Example 7
 
-    Optimize for maximum information preservation with reasonable compression.
+Input
 
-    ---
+"The retrieval pipeline performs query embedding, vector search, reranking and context expansion before passing context to the language model."
 
-    ### 10. Output Style
+Good Summary
 
-    Produce a coherent paragraph-based summary.
+"The retrieval pipeline embeds the query, performs vector search, reranks retrieved results, expands context, and provides the final context to the language model."
 
-    Avoid bullet points unless absolutely necessary.
+--------------------------------------------------
+OUTPUT REQUIREMENTS
+--------------------------------------------------
 
-    The summary should read naturally while preserving information density.
+• Produce ONE comprehensive summary.
+• Keep important technical information.
+• Keep important numbers.
+• Keep terminology exactly.
+• Do not invent information.
+• Do not write bullet points.
+• Do not explain your reasoning.
 
-    ---
+Return ONLY the following JSON:
 
-    Document Section:
+{{
+    "summary": "<comprehensive summary>"
+}}
 
-    {input_text}
-
-    # Examples
-
-    ## Example 1
-
-    ### Input
-
-    A Binary Search Tree (BST) is a binary tree where the left subtree contains values smaller than the root and the right subtree contains values larger than the root. Searching starts from the root and recursively moves left or right depending on the target value.
-
-    ### Output
-
-    A Binary Search Tree (BST) is a binary tree where left subtree values are smaller than the root and right subtree values are larger. Searching begins at the root and recursively traverses the appropriate subtree based on comparison with the target value.
-
-    ---
-
-    ## Example 2
-
-    ### Input
-
-    Redis stores data in memory. Since Redis stores data in memory, it provides very low latency. This in-memory architecture allows Redis to serve requests significantly faster than disk-based databases.
-
-    ### Output
-
-    Redis stores data in memory, enabling significantly lower latency and faster request processing than disk-based databases.
-
-    ---
-
-    ## Example 3
-
-    ### Input
-
-    The user uploads a PDF. The system extracts text from the PDF. The extracted text is split into chunks. Each chunk is embedded and stored inside the vector database.
-
-    ### Output
-
-    The system processes uploaded PDFs by extracting text, splitting it into chunks, generating embeddings for each chunk, and storing those embeddings in the vector database.
-
-    ---
-
-    ## Example 4
-
-    ### Input
-
-    RabbitMQ supports message acknowledgements, durable queues and publisher confirms. These mechanisms improve delivery reliability in distributed systems.
-
-    ### Output
-
-    RabbitMQ improves reliable message delivery through message acknowledgements, durable queues and publisher confirms.
-
-    ---
-
-    ## Example 5
-
-    ### Input
-
-    Transformers replaced recurrent architectures in many NLP tasks because self-attention allows every token to attend to every other token in parallel, improving scalability and long-range dependency modeling.
-
-    ### Output
-
-    Transformers replaced recurrent architectures in many NLP tasks because self-attention enables parallel interaction between all tokens, improving scalability and long-range dependency modeling.
-
-    ---
-
-    ## Example 6
-
-    ### Input
-
-    HTTP is stateless, meaning each request is independent. Authentication is commonly implemented using JWTs or session identifiers to associate requests with users.
-
-    ### Output
-
-    HTTP is stateless, with each request processed independently. User authentication is commonly achieved using JWTs or session identifiers to associate requests with users.
-
-    ---
-
-    ## Example 7
-
-    ### Input
-
-    Python supports dictionaries. A dictionary stores key-value pairs. For example, {{"name": "Alice"}} maps the key "name" to the value "Alice". Dictionaries provide efficient key-based lookups.
-
-    ### Output
-
-    Python dictionaries store key-value pairs and provide efficient key-based lookups.
-
-    ---
-
-    Now summarize the following document section according to the instructions above.
-    """
-
-
-def get_intermediate_reducer_prompt(input_text: str) -> str:
-
-    return f"""You are the Intermediate Reducer stage of a multi-stage Map-Reduce document summarization pipeline.
-
-## Context
-
-The input consists of multiple intermediate summaries generated by Mapper stages or previous Intermediate Reducer stages.
-
-These summaries represent different sections of the same document.
-
-Your output will NOT be shown to end users.
-
-It will either:
-
-- be consumed by another Intermediate Reducer, or
-- be consumed by the Final Reducer.
-
-Your responsibility is to merge these summaries into a single coherent summary while preserving as much important information as possible.
-
-Your objective is to further compress the document without losing important semantic information.
-
-If uncertain whether information is important, preserve it.
-
----
-
-## Instructions
-
-### 1. Preserve Information
-
-Preserve:
-
-- Important concepts
-- Definitions
-- Technical terminology
-- Algorithms
-- Procedures
-- Relationships
-- Important facts
-- Important conclusions
-- Important numerical values
-
----
-
-### 2. Merge Related Information
-
-Combine information discussing the same concept into one coherent explanation.
-
-Avoid repeating ideas already expressed elsewhere.
-
----
-
-### 3. Remove Redundancy
-
-Remove:
-
-- Duplicate concepts
-- Repeated explanations
-- Repeated examples
-- Unnecessary filler
-
----
-
-### 4. Preserve Logical Structure
-
-Maintain the logical progression of ideas.
-
-The resulting summary should read as one continuous document rather than independent summaries stitched together.
-
----
-
-### 5. Never Hallucinate
-
-Never:
-
-- introduce external knowledge
-- infer missing facts
-- invent conclusions
-
-Use only the provided summaries.
-
----
-
-### 6. Do NOT Perform Document-Level Reasoning
-
-Do NOT:
-
-- generate document topics
-- identify audience
-- infer document purpose
-- generate metadata
-- generate keywords
-- optimize for retrieval
-
-These responsibilities belong to the Final Reducer.
-
----
-
-### 7. Output Style
-
-Produce a coherent paragraph-based summary.
-
-Optimize for information preservation rather than readability.
-
----
-
-### Input
+Document Section
 
 {input_text}
+"""
 
----
+def get_intermediate_reducer_prompt(input_text: str) -> str:
+    return f"""
+You are the Intermediate Reducer stage of a hierarchical document summarization pipeline.
 
-## Examples
+ROLE
 
-### Input
+You receive multiple summaries generated from consecutive sections of the SAME document.
 
-Summary A:
-Redis stores data in memory, providing very low latency.
+Your task is NOT to aggressively compress them.
 
-Summary B:
-Redis persistence allows recovery after failures through RDB snapshots and AOF logging.
+Instead, merge them into one coherent summary while preserving as much information as possible.
 
-### Output
+Think of yourself as an editor combining multiple chapter summaries into one larger chapter summary.
 
-Redis stores data in memory, enabling very low latency while supporting durability through RDB snapshots and AOF logging for recovery after failures.
+Information preservation is your highest priority.
 
----
+--------------------------------------------------
+WHAT TO PRESERVE
+--------------------------------------------------
 
-### Input
+Always preserve:
 
-Summary A:
-HTTP is stateless.
+• Main ideas
+• Technical terminology
+• Definitions
+• Algorithms
+• Architectures
+• Mathematical concepts
+• Important examples
+• Experimental setup
+• Results
+• Hyperparameters
+• Important numbers
+• Relationships between concepts
+• Conclusions
 
-Summary B:
-Authentication commonly uses JWTs.
+--------------------------------------------------
+WHAT TO REMOVE
+--------------------------------------------------
 
-Summary C:
-Every HTTP request is independent.
+Remove only:
 
-### Output
+• Duplicate explanations
+• Repeated sentences
+• Overlapping descriptions
+• Redundant wording
 
-HTTP is stateless, meaning each request is processed independently. Authentication is commonly implemented using JWTs to associate requests with users.
+Never remove unique technical information.
 
----
+--------------------------------------------------
+GOOD EXAMPLES
+--------------------------------------------------
 
-Now merge the following summaries into one intermediate summary.
+Example 1
+
+Input Summary 1
+
+"The Transformer replaces recurrent neural networks with self-attention."
+
+Input Summary 2
+
+"Multi-head attention enables multiple attention patterns to be learned simultaneously."
+
+Good Output
+
+"The Transformer replaces recurrent neural networks with self-attention. Multi-head attention enables the model to learn multiple attention patterns simultaneously."
+
+--------------------------------------------------
+
+Example 2
+
+Input Summary 1
+
+"The encoder contains stacked self-attention and feed-forward layers."
+
+Input Summary 2
+
+"The decoder contains masked self-attention, encoder-decoder attention and feed-forward layers."
+
+Good Output
+
+"The Transformer architecture consists of an encoder and decoder. The encoder uses stacked self-attention and feed-forward layers, while the decoder combines masked self-attention, encoder-decoder attention and feed-forward layers."
+
+--------------------------------------------------
+
+Example 3
+
+Input Summary 1
+
+"Training uses Adam with learning rate warmup."
+
+Input Summary 2
+
+"The model is trained for 100,000 steps using label smoothing."
+
+Good Output
+
+"The model is trained using Adam with learning rate warmup for 100,000 steps and employs label smoothing during training."
+
+--------------------------------------------------
+
+Example 4
+
+Input Summary 1
+
+"Embeddings are compared using cosine similarity."
+
+Input Summary 2
+
+"Embeddings capture semantic meaning of text."
+
+Good Output
+
+"Embeddings provide dense semantic representations of text and are commonly compared using cosine similarity."
+
+--------------------------------------------------
+
+Example 5
+
+Input Summary 1
+
+"The retrieval pipeline performs vector search."
+
+Input Summary 2
+
+"Retrieved chunks are reranked before context expansion."
+
+Good Output
+
+"The retrieval pipeline performs vector search, reranks retrieved chunks and expands context before passing information to the language model."
+
+--------------------------------------------------
+
+Example 6
+
+Input Summary 1
+
+"Redis stores frequently accessed embeddings."
+
+Input Summary 2
+
+"Redis reduces repeated embedding computation."
+
+Good Output
+
+"Redis caches frequently accessed embeddings, reducing repeated embedding computation and improving latency."
+
+--------------------------------------------------
+
+Example 7
+
+Input Summary 1
+
+"The experiments compare Transformer against recurrent and convolutional models."
+
+Input Summary 2
+
+"The Transformer achieves better BLEU scores while requiring significantly less training time."
+
+Good Output
+
+"The experiments compare the Transformer with recurrent and convolutional architectures, showing higher BLEU scores while requiring significantly less training time."
+
+--------------------------------------------------
+OUTPUT REQUIREMENTS
+--------------------------------------------------
+
+• Merge all summaries into one coherent document.
+• Preserve every important technical detail.
+• Remove only duplicated information.
+• Keep terminology exactly.
+• Maintain logical flow.
+• Do not invent information.
+• Do not explain your reasoning.
+• Do not use bullet points.
+
+Return ONLY the following JSON:
+
+{{
+    "summary": "<merged comprehensive summary>"
+}}
+
+Intermediate Summaries
+
+{input_text}
 """
 
 def get_final_reducer_prompt(input_text: str) -> str:
-
     return f"""
-You are the Final Reducer stage of a multi-stage Map-Reduce document summarization pipeline.
+You are the Final Reducer stage of a hierarchical document summarization pipeline.
 
-## Context
+ROLE
 
-You have received the final compressed representation of an entire document.
+You receive the final merged summary of an entire document.
 
-Unlike previous stages, you now have visibility over the complete document.
+Your task is to generate a comprehensive Document Profile that preserves the document's knowledge for Retrieval-Augmented Generation (RAG).
 
-Your responsibility is to generate a structured document profile that will be stored in a database and used for semantic retrieval by downstream language models.
+This Document Profile will later be embedded into a vector database and used to determine whether this document should be retrieved for answering user queries.
 
-This output should represent the document as faithfully as possible while remaining concise.
+Therefore:
 
----
+Do NOT optimize for brevity.
 
-## Instructions
+Optimize for INFORMATION RETENTION.
 
-### 1. Generate a Comprehensive Summary
+Compress wording only when it does not remove knowledge.
 
-Write a coherent summary covering:
+--------------------------------------------------
+OBJECTIVE
+--------------------------------------------------
 
-- the primary concepts
-- important ideas
-- definitions
-- major procedures
-- conclusions
-- relationships between concepts
+Generate a rich document profile that captures the complete knowledge contained in the document.
 
-The summary should represent the entire document rather than individual sections.
+Someone reading only this profile should understand:
 
----
+• What the document is about
+• What problems it solves
+• What concepts it introduces
+• What methods or algorithms it describes
+• What important findings it presents
+• What terminology appears throughout the document
 
-### 2. Generate Topics
+--------------------------------------------------
+INCLUDE
+--------------------------------------------------
 
-Generate a concise list of representative topics.
+Whenever applicable preserve:
+
+• Purpose of the document
+• Main problem
+• Core concepts
+• Definitions
+• Technical terminology
+• Algorithms
+• Architectures
+• Pipelines
+• Mathematical ideas
+• Important equations (described naturally)
+• Experimental setup
+• Results
+• Important numbers
+• Hyperparameters
+• Design decisions
+• Advantages
+• Limitations
+• Future work
+• Relationships between concepts
+
+--------------------------------------------------
+REMOVE
+--------------------------------------------------
+
+Remove ONLY:
+
+• Duplicate explanations
+• Repeated wording
+• Repeated conclusions
+
+Never remove unique information.
+
+--------------------------------------------------
+GOOD EXAMPLES
+--------------------------------------------------
+
+Example 1
+
+Input
+
+"The document explains Retrieval-Augmented Generation. It discusses dense embeddings, sparse retrieval, reranking and context expansion."
+
+Good Output Summary
+
+"The document introduces Retrieval-Augmented Generation (RAG), explaining how external knowledge improves language model responses. It describes dense embeddings, sparse retrieval, reranking and context expansion as successive stages of the retrieval pipeline, highlighting how each contributes to retrieving relevant context before generation."
+
+Topics
+
+- Retrieval-Augmented Generation
+- Dense Embeddings
+- Sparse Retrieval
+- Reranking
+- Context Expansion
+
+--------------------------------------------------
+
+Example 2
+
+Input
+
+"The paper proposes the Transformer architecture. It replaces recurrence with self-attention. The model achieves state-of-the-art translation performance."
+
+Good Output Summary
+
+"The document presents the Transformer architecture for sequence modelling. It replaces recurrent neural networks with self-attention mechanisms, enabling efficient parallel computation and improved modelling of long-range dependencies. The architecture consists of encoder and decoder stacks using multi-head attention and feed-forward layers, achieving state-of-the-art machine translation performance."
+
+Topics
+
+- Transformer
+- Self-Attention
+- Multi-Head Attention
+- Machine Translation
+- Sequence Modelling
+
+--------------------------------------------------
+
+Example 3
+
+Input
+
+"The report explains vector databases, embeddings, indexing and similarity search."
+
+Good Output Summary
+
+"The document explains how vector databases store dense numerical representations of data and perform efficient semantic retrieval. It discusses embedding generation, vector indexing, approximate nearest neighbour search and similarity metrics such as cosine similarity, illustrating how these components enable scalable semantic search."
+
+Topics
+
+- Vector Database
+- Embeddings
+- Approximate Nearest Neighbour
+- Cosine Similarity
+- Semantic Search
+
+--------------------------------------------------
+
+Example 4
+
+Input
+
+"The document explains JWT authentication, middleware and role-based authorization."
+
+Good Output Summary
+
+"The document describes a JWT-based authentication system in which requests are validated by middleware before accessing protected resources. It explains token verification, user authentication, authorization and role-based access control."
+
+Topics
+
+- JWT
+- Authentication
+- Authorization
+- Middleware
+- RBAC
+
+--------------------------------------------------
+
+Example 5
+
+Input
+
+"The paper evaluates several neural architectures and concludes that attention-based models outperform recurrent models while requiring less training time."
+
+Good Output Summary
+
+"The document compares multiple neural architectures and demonstrates that attention-based models outperform recurrent approaches while significantly reducing training time. Experimental evaluation supports the effectiveness of attention mechanisms for sequence modelling."
+
+Topics
+
+- Attention Mechanism
+- Neural Networks
+- Sequence Modelling
+- Experimental Evaluation
+- Performance Comparison
+
+--------------------------------------------------
+OUTPUT REQUIREMENTS
+--------------------------------------------------
+
+Summary:
+
+• Comprehensive and information-rich.
+• Preserve important technical details.
+• Maintain logical flow.
+• Preserve terminology exactly.
+• Do not invent information.
+• Do not explain your reasoning.
+• Do not use bullet points inside the summary.
+• The summary should naturally scale with the document size. Large technical documents should produce longer summaries than small documents.
+
+Topics:
+
+Generate 5–15 concise technical topics.
 
 Topics should:
 
-- describe the major concepts
-- avoid duplicates
-- avoid overly generic words
-- contain between 3 and 10 items
-- be suitable for semantic retrieval
+• be noun phrases
+• preserve important terminology
+• avoid full sentences
+• avoid generic words such as "Technology", "Research", "Computer", "Paper"
 
-Examples:
+Return ONLY the following JSON:
 
-✓ Neural Networks
+{{
+    "summary": "<comprehensive document profile>",
+    "topics": [
+        "Topic 1",
+        "Topic 2",
+        "Topic 3"
+    ]
+}}
 
-✓ Binary Search Tree
-
-✓ TCP Congestion Control
-
-✗ Chapter 4
-
-✗ Example
-
-✗ Miscellaneous
-
----
-
-### 3. Optimize for Retrieval
-
-The summary should contain enough contextual information that an embedding model can distinguish this document from similar documents.
-
-Preserve important terminology.
-
-Do not remove technical names.
-
----
-
-### 4. Never Hallucinate
-
-Never introduce information that does not appear in the provided summary.
-
-Do not infer topics that are unsupported.
-
----
-
-### 5. Keep the Summary Self-Contained
-
-Someone reading only this summary should understand:
-
-- what the document discusses
-- its major concepts
-- its important conclusions
-
-without requiring access to the original document.
-
----
-
-#input
+Merged Document Summary
 
 {input_text}
-
----
-
-## Examples
-
-### Input
-
-The document explains Redis architecture, covering in-memory storage, persistence through RDB and AOF, replication, pub/sub messaging and distributed caching.
-
-### Output
-
-Summary:
-
-The document provides an overview of Redis architecture, explaining its in-memory storage model, persistence mechanisms using RDB snapshots and AOF logging, replication, publish-subscribe messaging and its use as a distributed caching system.
-
-Topics:
-
-- Redis
-- In-Memory Database
-- Persistence
-- Replication
-- Publish Subscribe
-- Distributed Caching
-
----
-
-### Input
-
-The document introduces Binary Search Trees, insertion, deletion, traversal algorithms, balancing issues and search complexity.
-
-### Output
-
-Summary:
-
-The document explains Binary Search Trees, including their structure, insertion and deletion operations, traversal algorithms, balancing considerations and the time complexity of common operations.
-
-Topics:
-
-- Binary Search Tree
-- Tree Traversal
-- Tree Insertion
-- Tree Deletion
-- Time Complexity
-- Data Structures
-
----
-
-Generate the final DocumentProfile from the following summary."""
-
+"""
 

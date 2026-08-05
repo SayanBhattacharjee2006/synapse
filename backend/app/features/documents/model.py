@@ -17,7 +17,7 @@ import uuid
 from app.core.database import Base
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.dialects.postgresql import UUID
-from sqlalchemy import ARRAY, func, ForeignKey, Enum, String, Integer, Text
+from sqlalchemy import ARRAY, func, ForeignKey, Enum, String, Integer, Text, DateTime
 from datetime import datetime
 
 
@@ -55,13 +55,17 @@ class Document(Base):
         Enum(ProcessingStatusEnum), nullable=False, default=ProcessingStatusEnum.pending
     )
 
-    error_message: Mapped[str | None] = mapped_column("errorMessage", Text, nullable=True)
+    error_message: Mapped[str | None] = mapped_column(
+        "errorMessage", Text, nullable=True
+    )
 
     is_deleted: Mapped[bool] = mapped_column("isDeleted", default=False)
 
     summary: Mapped[str | None] = mapped_column(Text, nullable=True)
 
-    topics: Mapped[list[str] | None] = mapped_column("topics", ARRAY(Text), nullable=True)
+    topics: Mapped[list[str] | None] = mapped_column(
+        "topics", ARRAY(Text), nullable=True
+    )
 
     summary_status: Mapped[ProcessingStatusEnum] = mapped_column(
         "summaryStatus",
@@ -71,7 +75,9 @@ class Document(Base):
     )
 
     summary_generated_at: Mapped[datetime | None] = mapped_column(
-        "summaryGeneratedAt", nullable=True
+        "summaryGeneratedAt",
+        DateTime(timezone=True),
+        nullable=True,
     )
 
     created_at: Mapped[datetime] = mapped_column("createdAt", server_default=func.now())
