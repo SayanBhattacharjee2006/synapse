@@ -10,6 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.features.auth.router import router as auth_router
 from app.ai.rag.collections import create_collections
 from app.features.documents.router import router as documents_router
+from app.core.logging import configure_logging, logger
 
 origins = [
     'http://localhost:5173',
@@ -18,13 +19,19 @@ origins = [
 @asynccontextmanager
 async def lifespan(app: FastAPI):
 
+    configure_logging()
+
     await create_collections()
+
+    logger.info("application.startup")
 
     async with AsyncPostgresSaver.from_conn_string(str(settings.DATABASE_URL).replace("+asyncpg", "")) as checkpoint_saver:
         await checkpoint_saver.setup()
         app.state.graph = get_graph(checkpoint_saver)
+        logger.info("application.ready")
         yield
 
+    logger.info("application.shutdown")
 
 
 
