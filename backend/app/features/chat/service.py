@@ -1,6 +1,5 @@
 import uuid
 import json
-from datetime import datetime
 from fastapi import Request
 from sqlalchemy import select, update
 from app.features.chat.schemas import ChatRequest
@@ -9,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.features.conversations.models import Message, Conversation
 from app.ai.llm import llm
 from app.ai.rag.services.summary_memory_sevice import store_summary
+from app.core.logging import logger
 
 
 async def stream_chat(
@@ -46,7 +46,11 @@ async def stream_chat(
     conversation = (await db.scalars(stmt)).one_or_none()
 
 
-    print("STREAMING CHAT FOR CONVERSATION ID: ", conversation_id, " USER ID: ", user_id, " MESSAGE: ", message.content, "TIME:", datetime.now() )
+    logger.bind(
+        conversation_id=str(conversation_id),
+        user_id=str(user_id),
+        has_uploaded_documents=conversation.document_count > 0,
+    ).info("chat.response.stream.started")
 
     async for event in graph.astream_events(
         {
@@ -66,7 +70,6 @@ async def stream_chat(
         ):
             token = event["data"]["chunk"].content
             if token:
-                print("STREAMING TOKEN: ", token, " TIME: ", datetime.now())
                 yield f"data: {token}\n\n"
 
     update_values = {}
@@ -105,4 +108,10 @@ async def stream_chat(
     if is_first_message:
         yield f"event: title\ndata: {json.dumps({'title': title})}\n\n"
 
+    logger.bind(
+        conversation_id=str(conversation_id),
+        user_id=str(user_id),
+        summary_updated=bool(summary),
+        title_generated=is_first_message,
+    ).info("chat.response.stream.completed")
     yield "data: [DONE]\n\n"

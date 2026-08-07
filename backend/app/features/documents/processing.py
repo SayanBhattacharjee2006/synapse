@@ -7,6 +7,7 @@ from sqlalchemy import select
 from app.integretions.s3.service import download_from_s3
 from app.ai.rag.ingestion.ingest import ingest_document, load_and_chunk_document
 from app.features.documents.summary.service import execute_doc_summary_pipeline
+from app.core.logging import logger
 async def process_document(document_id: uuid.UUID):
     async with session_factory() as session:
         document = None
@@ -21,6 +22,13 @@ async def process_document(document_id: uuid.UUID):
             if document is None:
                 raise ValueError("Document not found")
 
+            logger.bind(
+                document_id=str(document.id),
+                conversation_id=str(document.conversation_id),
+                user_id=str(document.user_id),
+                filename=document.filename,
+            ).info("document.processing.started")
+
             document.processing_status = ProcessingStatusEnum.processing
 
             await session.commit()
@@ -31,8 +39,6 @@ async def process_document(document_id: uuid.UUID):
 
             text_chunks = await load_and_chunk_document(document, file_path)
 
-            print(f"\n FROM PROCESSING FUNCTION: {document} \n")
-
             await asyncio.gather(
                 ingest_document(text_chunks),
                 execute_doc_summary_pipeline(text_chunks, document.id, document.conversation_id, document.user_id),
@@ -42,14 +48,19 @@ async def process_document(document_id: uuid.UUID):
             document.error_message = None
             await session.commit()
 
-            print(f"Document processing completed: {document.filename}")
+            logger.bind(
+                document_id=str(document.id),
+                conversation_id=str(document.conversation_id),
+                user_id=str(document.user_id),
+                filename=document.filename,
+            ).info("document.processing.completed")
 
         except Exception as e:
             if document:
                 document.processing_status = ProcessingStatusEnum.failed
                 document.error_message = str(e)
                 await session.commit()
-            print(f"Document processing failed: {e}")
+            logger.bind(document_id=str(document_id)).exception("document.processing.failed")
 
         finally:
             if file_path and os.path.exists(file_path):

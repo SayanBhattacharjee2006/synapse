@@ -2,6 +2,7 @@ from langchain_openai import OpenAIEmbeddings
 from fastembed import SparseTextEmbedding, LateInteractionTextEmbedding
 from functools import lru_cache
 import asyncio
+from app.core.logging import logger
 
 
 @lru_cache(maxsize=1)
@@ -43,9 +44,14 @@ async def embed_chunks_in_batches(texts: list[str], batch_size: int = 32):
     sparse_vectors = []
     multi_vectors = []
 
+    logger.bind(chunk_count=len(texts)).info("document.embedding.started")
+
     for i in range(0, len(texts), batch_size):
         batch = texts[i:i + batch_size]
-        print(f"Embedding batch {i // batch_size + 1} ({len(batch)} chunks)...")
+        logger.bind(
+            batch_number=i // batch_size + 1,
+            chunk_count=len(batch),
+        ).info("document.embedding.batch.started")
 
         batch_dense = await get_dense_embeddings().aembed_documents(batch)
         batch_sparse = await asyncio.to_thread(embed_sparse_documents, batch)
@@ -55,4 +61,5 @@ async def embed_chunks_in_batches(texts: list[str], batch_size: int = 32):
         sparse_vectors.extend(batch_sparse)
         multi_vectors.extend(batch_multi)
 
+    logger.bind(chunk_count=len(texts)).info("document.embedding.completed")
     return dense_vectors, sparse_vectors, multi_vectors

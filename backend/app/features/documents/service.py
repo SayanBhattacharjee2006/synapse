@@ -13,19 +13,46 @@ from app.ai.rag.services.document_memory_service import delete_document_chunks
 from app.ai.rag.services.document_summary_service import delete_document_summary
 from app.features.documents.summary.schemas import DocumentProfile
 from app.features.documents.model import ProcessingStatusEnum
+from app.core.logging import logger
 
 
 async def upload_document(
     db: AsyncSession, file: UploadFile, user_id: uuid.UUID, conversation_id: uuid.UUID
 ):
+    logger.bind(
+        user_id=str(user_id),
+        conversation_id=str(conversation_id),
+        filename=file.filename,
+        mime_type=file.content_type,
+        file_size=file.size,
+    ).info("document.upload.started")
+
     # extension validation
     if file.filename is None:
+        logger.bind(
+            user_id=str(user_id),
+            conversation_id=str(conversation_id),
+            error_reason="missing_filename",
+        ).warning("document.upload.failed")
         raise HTTPException(status_code=400, detail="File name is required")
     ext = file.filename.rsplit(".", 1)[-1].lower()
     if ext not in ALLOWED_EXTENSIONS:
+        logger.bind(
+            user_id=str(user_id),
+            conversation_id=str(conversation_id),
+            filename=file.filename,
+            error_reason="invalid_file_type",
+        ).warning("document.upload.failed")
         raise HTTPException(status_code=400, detail="Invalid file type")
 
     if file.size is not None and file.size > settings.MAX_FILE_SIZE:
+        logger.bind(
+            user_id=str(user_id),
+            conversation_id=str(conversation_id),
+            filename=file.filename,
+            file_size=file.size,
+            error_reason="file_size_exceeded",
+        ).warning("document.upload.failed")
         raise HTTPException(status_code=400, detail="File size too large")
 
     stmt = select(Conversation).where(
@@ -37,6 +64,11 @@ async def upload_document(
     conversation = (await db.scalars(stmt)).one_or_none()
 
     if conversation is None:
+        logger.bind(
+            user_id=str(user_id),
+            conversation_id=str(conversation_id),
+            error_reason="conversation_not_found",
+        ).warning("document.upload.failed")
         raise HTTPException(status_code=404, detail="Conversation not found")
 
     try:
@@ -70,6 +102,15 @@ async def upload_document(
         await db.commit()
         await db.refresh(document_row)
 
+        logger.bind(
+            document_id=str(document_row.id),
+            user_id=str(user_id),
+            conversation_id=str(conversation_id),
+            filename=document_row.filename,
+            mime_type=document_row.mime_type,
+            file_size=document_row.file_size,
+        ).info("document.upload.completed")
+
         return document_row
 
     except HTTPException:
@@ -78,6 +119,11 @@ async def upload_document(
 
     except Exception as e:
         await db.rollback()
+        logger.bind(
+            user_id=str(user_id),
+            conversation_id=str(conversation_id),
+            filename=file.filename,
+        ).exception("document.upload.failed")
         raise HTTPException(status_code=500, detail=str(e))
 
 

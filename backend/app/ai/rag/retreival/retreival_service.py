@@ -8,6 +8,7 @@ from app.ai.rag.embeddings import (
 from app.core.config import settings
 from qdrant_client import models
 from app.features.documents.dependency import create_context
+from app.core.logging import logger
 
 
 async def retreive_context(query: str, conversation_id: str, k: int = 5):
@@ -53,12 +54,13 @@ async def retreive_context(query: str, conversation_id: str, k: int = 5):
         limit=k,
     )
 
-    print("\n RETREIVED DOCUMENT SUMMARIES \n ", )
-    for doc in document_summaries.points:
-        print("=====================\n filename: ", doc.payload.get("filename"), "\n\n")
-        print(doc.payload.get("summary"), "\n\n")
+    logger.bind(
+        conversation_id=conversation_id,
+        document_count=len(document_summaries.points),
+    ).info("rag.document_summary.retrieval.completed")
 
     if not document_summaries.points:
+        logger.bind(conversation_id=conversation_id).warning("rag.retrieval.not_found")
         return "", False
 
     multi_vector = await asyncio.to_thread(embed_late_interaction_query, query)
@@ -107,17 +109,21 @@ async def retreive_context(query: str, conversation_id: str, k: int = 5):
     docs = results.points
 
     if not docs:
+        logger.bind(conversation_id=conversation_id).warning("rag.document_chunks.not_found")
         return "", False
 
     best_score = docs[0].score
-    print("BEST SCORE : ", best_score)
-
-    for doc in docs:
-        print("DOC ID : ", doc.id)
-        print("SCORE : ", doc.score)
-        print("chunk: ", doc.payload.get("page_content"), "\n\n")
+    logger.bind(
+        conversation_id=conversation_id,
+        result_count=len(docs),
+        best_score=best_score,
+    ).info("rag.document_chunks.retrieval.completed")
 
     if best_score < 0.3:
+        logger.bind(
+            conversation_id=conversation_id,
+            best_score=best_score,
+        ).warning("rag.retrieval.below_threshold")
         return "", False
 
     context = create_context(docs)

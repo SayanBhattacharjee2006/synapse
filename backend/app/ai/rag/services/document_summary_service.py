@@ -8,8 +8,16 @@ from app.features.documents.formatter import format_document_profile
 from qdrant_client import models
 
 from app.features.documents.model import Document
+from app.core.logging import logger
 
 async def store_document_summary(doc: Document,document_profile: DocumentProfile)-> None: 
+
+    logger.bind(
+        document_id=str(doc.id),
+        conversation_id=str(doc.conversation_id),
+        collection_name=settings.QDRANT_DOCUMENT_SUMMARY_COLLECTION,
+        points_upserted=1,
+    ).info("qdrant.summary.upsert.started")
 
     formatted_document_profile = format_document_profile(document_profile)
 
@@ -41,6 +49,13 @@ async def store_document_summary(doc: Document,document_profile: DocumentProfile
             )
         ]
     )
+
+    logger.bind(
+        document_id=str(doc.id),
+        conversation_id=str(doc.conversation_id),
+        collection_name=settings.QDRANT_DOCUMENT_SUMMARY_COLLECTION,
+        points_upserted=1,
+    ).info("qdrant.summary.upsert.completed")
 
 
 async def delete_document_summary(document_id: uuid.UUID):

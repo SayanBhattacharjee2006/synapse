@@ -15,10 +15,11 @@ from app.ai.rag.services.document_summary_service import store_document_summary
 from app.features.documents.model import ProcessingStatusEnum
 from app.core.config import settings
 from app.core.database import session_factory
+from app.core.logging import logger
 
 
 async def execute_mapper_stage(chunks: list[Document]) -> list[IntermediateSummary]:
-    print("Reached execute_mapper_stage function")
+    logger.bind(chunk_count=len(chunks)).info("document.summary.mapper.started")
     document_groups = group_by_tokens(
         chunks,
         lambda x: x.page_content,
@@ -29,6 +30,11 @@ async def execute_mapper_stage(chunks: list[Document]) -> list[IntermediateSumma
         *(summarize_group(group) for group in document_groups)
     )
 
+    logger.bind(
+        chunk_count=len(chunks),
+        group_count=len(document_groups),
+    ).info("document.summary.mapper.completed")
+
     return summarized_groups
 
 
@@ -36,8 +42,7 @@ async def execute_reducer_stage(
     summary_list: list[IntermediateSummary],
 ) -> DocumentProfile:
 
-    print("\nReached execute_reducer_stage function\n")
-    print(f"\n summary_list length: {len(summary_list)}\n")
+    logger.bind(summary_count=len(summary_list)).info("document.summary.reducer.started")
     while len(summary_list) > 1:
         summarised_groups = group_by_tokens(
             summary_list,
@@ -48,10 +53,9 @@ async def execute_reducer_stage(
             *(intermediate_reducer(group) for group in summarised_groups)
         )
 
-        print(f"\n INSIDE WHILE LOOP \n summary_list length: {len(summary_list)}\n")
-
-    print("Reached final_reducer function")
     final_summary = await final_reducer(summary_list[0])
+
+    logger.bind().info("document.summary.reducer.completed")
 
     return final_summary
 
@@ -60,7 +64,6 @@ async def generate_document_profile(chunks: list[Document]) -> DocumentProfile:
 
     intermediate_summaries = await execute_mapper_stage(chunks)
     document_profile = await execute_reducer_stage(intermediate_summaries)
-    print(f"\n\n ---------DOCUMENT SUMMARY-------\n {document_profile.summary}")
     return document_profile
 
 
@@ -72,8 +75,12 @@ async def execute_doc_summary_pipeline(
 ):
     async with session_factory() as session:
         try:
-            print("Reached execute_doc_summary_pipeline function")
-            print("\n now document_id: ", document_id)
+            logger.bind(
+                document_id=str(document_id),
+                conversation_id=str(conversation_id),
+                user_id=str(user_id),
+                chunk_count=len(chunks),
+            ).info("document.summary.started")
 
             doc = await get_document_by_id(
                 session,
@@ -87,8 +94,6 @@ async def execute_doc_summary_pipeline(
                 status=ProcessingStatusEnum.processing,
             )
 
-            print("Updated document status to processing")
-
             document_profile = await generate_document_profile(chunks)
 
             await update_document_profile(
@@ -96,14 +101,10 @@ async def execute_doc_summary_pipeline(
                 document_profile,
             )
 
-            print("Updated document profile")
-
             await store_document_summary(
                 doc,
                 document_profile,
             )
-
-            print("Stored document summary")
 
             await update_doc_summary_status(
                 doc,
@@ -113,7 +114,18 @@ async def execute_doc_summary_pipeline(
 
             await session.commit()
 
+            logger.bind(
+                document_id=str(document_id),
+                conversation_id=str(conversation_id),
+                user_id=str(user_id),
+            ).info("document.summary.completed")
+
         except Exception:
+            logger.bind(
+                document_id=str(document_id),
+                conversation_id=str(conversation_id),
+                user_id=str(user_id),
+            ).exception("document.summary.failed")
             await session.rollback()
 
             try:

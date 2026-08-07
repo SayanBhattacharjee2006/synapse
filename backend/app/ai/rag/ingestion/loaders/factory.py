@@ -2,6 +2,7 @@ from app.ai.rag.ingestion.loaders.pdf import load_pdf
 from app.ai.rag.ingestion.loaders.word import load_word
 from app.ai.rag.ingestion.loaders.txt import load_txt
 from app.ai.rag.ingestion.loaders.markdown import load_markdown
+from app.core.logging import logger
 
 loaders = {
     "pdf": load_pdf,
@@ -15,7 +16,6 @@ loaders = {
 
 
 async def load_document(file_path):
-    print("Reached load_document function")
     ext = file_path.rsplit(".", 1)[-1].lower()
     
     if ext not in loaders.keys():
@@ -23,11 +23,10 @@ async def load_document(file_path):
 
     loader = loaders.get(ext)
 
-    print("Loader : ", loader)
+    logger.bind(loader=loader.__name__, file_extension=ext).info("document.loader.selected")
 
     if loader is None:
         raise ValueError(f"Unsupported file type: {ext}")
 
     return await loader(file_path)
 
-    
