@@ -1,5 +1,6 @@
 import uuid
 import json
+import langsmith as ls
 from fastapi import Request
 from sqlalchemy import select, update
 from app.features.chat.schemas import ChatRequest
@@ -44,33 +45,43 @@ async def stream_chat(
     )
 
     conversation = (await db.scalars(stmt)).one_or_none()
-
+    has_uploaded_documents = conversation.document_count > 0
 
     logger.bind(
         conversation_id=str(conversation_id),
         user_id=str(user_id),
-        has_uploaded_documents=conversation.document_count > 0,
+        has_uploaded_documents=has_uploaded_documents,
     ).info("chat.response.stream.started")
 
-    async for event in graph.astream_events(
-        {
-            "messages": [HumanMessage(content=message.content)],
-            "conversation_id":str(conversation_id),
-            "has_uploaded_documents": conversation.document_count > 0,
-        },
-        config=config,
-        version="v2",
-    ):
-        if event["event"] == "on_chain_end" and event.get("name") == "summarisation":
-            summary = event["data"]["output"].get("summary", "")
+    metadata = {
+        "conversation_id": str(conversation_id),
+        "user_id": str(user_id),
+        "has_uploaded_documents": has_uploaded_documents,
+    }
 
-        if (
-            event["event"] == "on_chat_model_stream"
-            and event.get("metadata", {}).get("langgraph_node") == "llm"
+    with ls.tracing_context(
+        metadata=metadata,
+        tags=['synapse', 'chat'],
+    ):
+        async for event in graph.astream_events(
+            {
+                "messages": [HumanMessage(content=message.content)],
+                "conversation_id":str(conversation_id),
+                "has_uploaded_documents": has_uploaded_documents,
+            },
+            config=config,
+            version="v2",
         ):
-            token = event["data"]["chunk"].content
-            if token:
-                yield f"data: {token}\n\n"
+            if event["event"] == "on_chain_end" and event.get("name") == "summarisation":
+                summary = event["data"]["output"].get("summary", "")
+
+            if (
+                event["event"] == "on_chat_model_stream"
+                and event.get("metadata", {}).get("langgraph_node") == "llm"
+            ):
+                token = event["data"]["chunk"].content
+                if token:
+                    yield f"data: {token}\n\n"
 
     update_values = {}
 

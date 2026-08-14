@@ -56,6 +56,8 @@ class Settings(BaseSettings):
     SUMMARY_CHUNK_GROUPING_THRESHOLD:int
     INTERMEDIATE_SUMMARY_THRESOLD:int
 
+    SENTRY_DSN: str | None = None
+    SENTRY_ENVIRONMENT: str = "development"
     
     @model_validator(mode="after")
     def validate_auth_settings(self):

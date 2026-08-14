@@ -11,10 +11,13 @@ from app.features.auth.router import router as auth_router
 from app.ai.rag.collections import create_collections
 from app.features.documents.router import router as documents_router
 from app.core.logging import configure_logging, logger
+from app.integretions.error_monitoring.sentry import configure_sentry
 
 origins = [
     'http://localhost:5173',
 ]
+
+configure_sentry()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -58,3 +61,4 @@ app.include_router(documents_router, prefix="/api/v1")
 @app.get("/")
 async def root():
     return {"status": "ok"}
+

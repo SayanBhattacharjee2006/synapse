@@ -29,7 +29,7 @@ async def llm_node(state: GraphState) -> dict:
 
     logger.bind(
         conversation_id=str(state.get("conversation_id", "")),
-        router=str(router),
+        router=router.value,
         retrieval_found=retrieval_found,
         web_found=web_found,
     ).info("chat.llm.started")
@@ -51,7 +51,7 @@ async def llm_node(state: GraphState) -> dict:
 
     logger.bind(
         conversation_id=str(state.get("conversation_id", "")),
-        router=str(router),
+        router=router.value,
     ).info("chat.llm.completed")
 
     return {
@@ -147,7 +147,7 @@ async def evaluator_node(state: GraphState) -> dict:
 
     logger.bind(
         conversation_id=str(state.get("conversation_id", "")),
-        router=str(response.router),
+        router=response.router.value,
     ).info("chat.evaluation.completed")
     return {
         "router": response.router,
@@ -218,7 +218,7 @@ async def query_optimizer_node(state: GraphState) -> dict:
     router = state.get("router", RouterType.NONE)
     logger.bind(
         conversation_id=str(state.get("conversation_id", "")),
-        router=str(router),
+        router=router.value,
     ).info("chat.query_optimization.started")
     optimizer_prompt = get_query_optimizer_prompt()
 
@@ -231,7 +231,7 @@ async def query_optimizer_node(state: GraphState) -> dict:
 
     logger.bind(
         conversation_id=str(state.get("conversation_id", "")),
-        router=str(router),
+        router=router.value,
     ).info("chat.query_optimization.completed")
 
     return {
