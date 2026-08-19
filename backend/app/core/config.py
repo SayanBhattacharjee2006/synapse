@@ -58,6 +58,8 @@ class Settings(BaseSettings):
 
     SENTRY_DSN: str | None = None
     SENTRY_ENVIRONMENT: str = "development"
+
+    EVAL_CONVO_ID: str
     
     @model_validator(mode="after")
     def validate_auth_settings(self):

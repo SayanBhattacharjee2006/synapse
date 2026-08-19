@@ -30,6 +30,7 @@ async def lifespan(app: FastAPI):
 
     async with AsyncPostgresSaver.from_conn_string(str(settings.DATABASE_URL).replace("+asyncpg", "")) as checkpoint_saver:
         await checkpoint_saver.setup()
+        app.state.checkpoint_saver = checkpoint_saver
         app.state.graph = get_graph(checkpoint_saver)
         logger.info("application.ready")
         yield

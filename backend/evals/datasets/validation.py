@@ -69,7 +69,7 @@ def validate_dataset(json_path: str):
 
     return valid_inputs, valid_outputs
 
-if __name__ == "__main__":
-    validated_inputs, validated_outputs = validate_dataset("evals/datasets/golden.jsonl")
-    print(f"Validated input: \n  {validated_inputs}\n")
-    print(f"Validated outputs: \n  {validated_outputs}")
+# if __name__ == "__main__":
+#     validated_inputs, validated_outputs = validate_dataset("evals/datasets/golden.jsonl")
+#     print(f"Validated input: \n  {validated_inputs}\n")
+#     print(f"Validated outputs: \n  {validated_outputs}")
