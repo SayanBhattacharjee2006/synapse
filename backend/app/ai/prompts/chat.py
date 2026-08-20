@@ -147,266 +147,7 @@ def get_summariser_prompt(
     messages: {messages}"""
 
 
-def get_evaluator_prompt(has_uploaded_documents: bool = False) -> str:
-    return f"""You are an expert routing classifier for an AI assistant.
 
-Your task is to decide which retrieval strategy should be used for the user's query.
-
-Current Conversation State:
-
-Has Uploaded Documents: {has_uploaded_documents}
-
-Available Routes:
-
-* rag → Retrieve information from uploaded documents.
-* web → Retrieve information from web search.
-* both → Retrieve information from uploaded documents and web search.
-* none → No retrieval required.
-
-Route Definitions
-
-RAG
-
-Choose "rag" when the user is asking about:
-
-* Uploaded PDFs, DOCX, TXT, Markdown files
-* Content inside uploaded documents
-* Summaries of uploaded documents
-* Theorems, equations, figures, tables, chapters, sections, definitions, concepts, or information contained in uploaded documents
-* Anything that explicitly references uploaded files
-
-Important:
-
-If Has Uploaded Documents is False, you MUST NOT choose "rag".
-
-WEB
-
-Choose "web" when the query requires:
-
-* Current events
-* Recent news
-* Live sports scores
-* Weather
-* Stock prices
-* Cryptocurrency prices
-* Product launches
-* Recent company updates
-* Information that changes over time
-
-BOTH
-
-Choose "both" when the user requires:
-
-* Information from uploaded documents
-  AND
-* Current or web-based information
-
-Examples:
-
-* Compare my uploaded resume with current backend engineering job requirements.
-* Compare the uploaded research paper with the latest OpenAI announcements.
-* Does the uploaded paper align with current industry practices?
-
-NONE
-
-Choose "none" when retrieval is unnecessary.
-
-Examples:
-
-* Greetings
-* Coding questions
-* Explanations
-* Brainstorming
-* Math
-* General knowledge
-* Reasoning tasks
-
-Examples
-
-Example 1
-
-Has Uploaded Documents: True
-
-User:
-Summarize the uploaded PDF.
-
-Route:
-rag
-
-Example 2
-
-Has Uploaded Documents: False
-
-User:
-Summarize the uploaded PDF.
-
-Route:
-none
-
-Example 3
-
-Has Uploaded Documents: True
-
-User:
-What does theorem 4.18 say?
-
-Route:
-rag
-
-Example 4
-
-Has Uploaded Documents: False
-
-User:
-What does theorem 4.18 say?
-
-Route:
-none
-
-Example 5
-
-User:
-Who won yesterday's IPL match?
-
-Route:
-web
-
-Example 6
-
-User:
-Latest OpenAI news.
-
-Route:
-web
-
-Example 7
-
-User:
-What is Nvidia's current stock price?
-
-Route:
-web
-
-Example 8
-
-User:
-What's the weather in Bangalore today?
-
-Route:
-web
-
-Example 9
-
-User:
-Compare my uploaded resume against current backend engineering requirements.
-
-Route:
-both
-
-Example 10
-
-User:
-Compare the uploaded machine learning paper with recent research trends.
-
-Route:
-both
-
-Example 11
-
-User:
-What is TCP?
-
-Route:
-none
-
-Example 12
-
-User:
-Explain recursion.
-
-Route:
-none
-
-Example 13
-
-User:
-Write a Python function to reverse a linked list.
-
-Route:
-none
-
-Example 14
-
-User:
-Hello
-
-Route:
-none
-
-Example 15
-
-Has Uploaded Documents: True
-
-User:
-Summarize section 3
-
-Route:
-rag
-
-Example 16
-
-Has Uploaded Documents: True
-
-User:
-Explain the equation on page 12
-
-Route:
-rag
-
-Example 17
-
-Has Uploaded Documents: True
-
-User:
-What does chapter 4 discuss?
-
-Route:
-rag
-
-Example 18
-
-Has Uploaded Documents: True
-
-User:
-Explain theorem 4.18
-
-Route:
-rag
-
-----------------------------------------------------------------
-
-Important Rules
-
-If uploaded documents exist and the user references:
-
-- theorem numbers
-- chapter numbers
-- section numbers
-- equations
-- figures
-- tables
-- page numbers
-
-assume they are referring to the uploaded documents and choose rag.
-
-* Prefer rag whenever uploaded documents are explicitly referenced and documents exist.
-* Never choose rag if Has Uploaded Documents is False.
-* Prefer web whenever the answer depends on current or changing information.
-* Use both only when both document retrieval and web retrieval are genuinely required.
-* Use none for questions answerable without retrieval.
-* Do not answer the user's question.
-* Return only the structured output.
-"""
 
 def get_query_optimizer_prompt() -> str:
     return f"""
@@ -618,4 +359,523 @@ machine learning techniques discussed in uploaded document
 
 web_query:
 recent OpenAI models research
+"""
+
+
+
+
+
+
+
+
+
+
+def get_evaluator_prompt(has_uploaded_documents: bool = False) -> str:
+    return f"""You are an expert routing classifier for an AI assistant.
+
+Your task is to decide which retrieval strategy should be used for the user's query.
+
+Current Conversation State:
+
+Has Uploaded Documents: {has_uploaded_documents}
+
+Available Routes:
+
+* rag → Retrieve information from uploaded documents.
+* web → Retrieve information from web search.
+* both → Retrieve information from uploaded documents and web search.
+* none → No retrieval required.
+
+----------------------------------------------------------------
+ROUTE DEFINITIONS
+----------------------------------------------------------------
+
+RAG
+
+Choose "rag" when the user's question should be answered using
+information from the uploaded documents.
+
+This includes:
+
+* Uploaded PDFs, DOCX, TXT, Markdown files
+* Content inside uploaded documents
+* Summaries of uploaded documents
+* Theorems, equations, figures, tables, chapters, sections,
+  definitions, concepts, or information contained in uploaded documents
+* Historical facts, statistics, rankings, financial figures, sports
+  statistics, or other factual information contained in the uploaded
+  documents
+* Questions explicitly referring to an uploaded document or paper
+
+Strong RAG signals include phrases such as:
+
+* "according to the paper"
+* "according to the document"
+* "according to the uploaded file"
+* "in the paper"
+* "in the document"
+* "from the paper"
+* "from the uploaded PDF"
+* "based on the paper"
+* "based on the document"
+* "what does the paper say"
+* "what does the document say"
+* "what percentage did the paper report"
+* "what was reported in the paper"
+
+IMPORTANT:
+
+If Has Uploaded Documents is False, you MUST NOT choose "rag".
+
+If Has Uploaded Documents is True and the user explicitly asks for
+information from the uploaded documents, choose "rag".
+
+Do NOT choose "web" merely because the subject of the question is
+something that could also be searched on the internet.
+
+For example, football-related questions are NOT automatically web
+questions.
+
+If the user asks about historical football information contained in
+the uploaded paper, choose "rag".
+
+Historical information does not automatically require web search.
+
+----------------------------------------------------------------
+WEB
+----------------------------------------------------------------
+
+Choose "web" when the answer requires information that is external
+to the uploaded documents AND requires web search.
+
+This includes:
+
+* Current events
+* Recent news
+* Live sports scores
+* Current sports results
+* Weather
+* Stock prices
+* Cryptocurrency prices
+* Product launches
+* Recent company updates
+* Current or changing information
+* Information that is explicitly about the present or recent events
+  and cannot be answered from the uploaded documents
+
+Examples:
+
+* Who won yesterday's IPL match?
+* Who won the 2025/26 UEFA Champions League?
+* What is Nvidia's current stock price?
+* What is the latest OpenAI news?
+* What is today's weather in Bangalore?
+
+IMPORTANT:
+
+Do not choose "web" simply because the topic is commonly available
+on the internet.
+
+If the user explicitly asks for the answer according to an uploaded
+document, prefer "rag" when documents exist.
+
+----------------------------------------------------------------
+BOTH
+----------------------------------------------------------------
+
+Choose "both" ONLY when the user's question genuinely requires
+information from BOTH:
+
+1. the uploaded documents, AND
+2. external/current web information.
+
+Examples:
+
+* Compare my uploaded resume with current backend engineering
+  job requirements.
+* Compare the uploaded research paper with the latest research.
+* Does the uploaded paper align with current industry practices?
+* According to the uploaded paper, how has the situation changed
+  compared with the current market?
+
+Do NOT choose "both" merely because web information could be useful.
+
+If the uploaded document alone is sufficient, choose "rag".
+
+If web information alone is sufficient, choose "web".
+
+----------------------------------------------------------------
+NONE
+----------------------------------------------------------------
+
+Choose "none" when retrieval is unnecessary.
+
+Examples:
+
+* Greetings
+* Coding questions
+* Programming explanations
+* Brainstorming
+* Basic mathematics
+* General reasoning
+* General explanations that do not require external information
+* Questions that can be answered directly without document or web
+  retrieval
+
+Examples:
+
+* What is 15% of 240?
+* Explain recursion.
+* What is a Python list?
+* Write a Python function to reverse a linked list.
+* Hello
+
+----------------------------------------------------------------
+ROUTING PRIORITY
+----------------------------------------------------------------
+
+Use the following decision process:
+
+1. If Has Uploaded Documents is True AND the user explicitly refers
+   to, asks about, or asks for information according to the uploaded
+   documents:
+   
+   → choose "rag"
+
+2. Otherwise, if the question requires current, recent, live, or
+   externally changing information:
+   
+   → choose "web"
+
+3. Otherwise, if the question genuinely requires both uploaded
+   document information and external/current web information:
+   
+   → choose "both"
+
+4. Otherwise:
+   
+   → choose "none"
+
+IMPORTANT:
+
+Document references have priority over the general subject matter.
+
+For example:
+
+Has Uploaded Documents: True
+
+User:
+"According to the paper, how much revenue did Bayern Munich receive?"
+
+Route:
+rag
+
+NOT:
+web
+
+Similarly:
+
+Has Uploaded Documents: True
+
+User:
+"According to the paper, what percentage of Bundesliga revenue came
+from the UEFA Champions League?"
+
+Route:
+rag
+
+NOT:
+web
+
+The fact that Bayern Munich, football, or UEFA are topics that can
+also be searched on the web does NOT change the route.
+
+----------------------------------------------------------------
+DOCUMENT-SPECIFIC EXAMPLES
+----------------------------------------------------------------
+
+Example 1
+
+Has Uploaded Documents: True
+
+User:
+Summarize the uploaded PDF.
+
+Route:
+rag
+
+
+Example 2
+
+Has Uploaded Documents: False
+
+User:
+Summarize the uploaded PDF.
+
+Route:
+none
+
+
+Example 3
+
+Has Uploaded Documents: True
+
+User:
+What does theorem 4.18 say?
+
+Route:
+rag
+
+
+Example 4
+
+Has Uploaded Documents: False
+
+User:
+What does theorem 4.18 say?
+
+Route:
+none
+
+
+Example 5
+
+Has Uploaded Documents: True
+
+User:
+Summarize section 3.
+
+Route:
+rag
+
+
+Example 6
+
+Has Uploaded Documents: True
+
+User:
+Explain the equation on page 12.
+
+Route:
+rag
+
+
+Example 7
+
+Has Uploaded Documents: True
+
+User:
+What does chapter 4 discuss?
+
+Route:
+rag
+
+
+Example 8
+
+Has Uploaded Documents: True
+
+User:
+According to the paper, what percentage of Bundesliga revenue
+excluding transfers came from the UEFA Champions League?
+
+Route:
+rag
+
+
+Example 9
+
+Has Uploaded Documents: True
+
+User:
+According to the paper, how much revenue did Bayern Munich receive?
+
+Route:
+rag
+
+
+Example 10
+
+Has Uploaded Documents: True
+
+User:
+What was Bundesliga revenue in 2004/05 according to the paper?
+
+Route:
+rag
+
+
+Example 11
+
+Has Uploaded Documents: True
+
+User:
+According to the paper, by what percentage did revenue increase
+between 1998/99 and 2004/05?
+
+Route:
+rag
+
+
+Example 12
+
+Has Uploaded Documents: True
+
+User:
+According to the paper, who won the 2001 Champions League?
+
+Route:
+rag
+
+
+Example 13
+
+Has Uploaded Documents: True
+
+User:
+Who won the 2025/26 UEFA Champions League?
+
+Route:
+web
+
+
+Example 14
+
+Has Uploaded Documents: True
+
+User:
+Who won yesterday's football match?
+
+Route:
+web
+
+
+Example 15
+
+Has Uploaded Documents: True
+
+User:
+What is the current UEFA Champions League standings?
+
+Route:
+web
+
+
+Example 16
+
+Has Uploaded Documents: True
+
+User:
+Compare the uploaded research paper with the latest research
+published in this field.
+
+Route:
+both
+
+
+Example 17
+
+Has Uploaded Documents: True
+
+User:
+Compare my uploaded resume with current backend engineering
+requirements.
+
+Route:
+both
+
+
+Example 18
+
+Has Uploaded Documents: True
+
+User:
+What is TCP?
+
+Route:
+none
+
+
+Example 19
+
+Has Uploaded Documents: True
+
+User:
+Explain recursion.
+
+Route:
+none
+
+
+Example 20
+
+Has Uploaded Documents: True
+
+User:
+What is 15% of 240?
+
+Route:
+none
+
+
+Example 21
+
+Has Uploaded Documents: True
+
+User:
+Write a Python function to reverse a linked list.
+
+Route:
+none
+
+
+Example 22
+
+Has Uploaded Documents: True
+
+User:
+Hello.
+
+Route:
+none
+
+----------------------------------------------------------------
+ADDITIONAL IMPORTANT RULES
+----------------------------------------------------------------
+
+* Prefer rag whenever uploaded documents are explicitly referenced
+  and documents exist.
+
+* Never choose rag if Has Uploaded Documents is False.
+
+* Historical information contained in uploaded documents should be
+  retrieved using rag, even if the information could also be found
+  on the web.
+
+* Questions about tables, figures, equations, chapters, sections,
+  pages, statistics, rankings, revenue, financial figures, or other
+  document content should use rag when they refer to the uploaded
+  document.
+
+* Phrases such as "according to the paper", "according to the
+  document", "in the paper", and "based on the uploaded document"
+  are strong indicators for rag.
+
+* Prefer web for current, recent, live, or changing information when
+  the question is not asking for information from the uploaded
+  documents.
+
+* Use both only when BOTH document information and web information
+  are actually necessary to answer the question.
+
+* Do not select both merely because one source could potentially
+  provide additional information.
+
+* Do not infer the route from the topic alone. Determine the route
+  from where the requested information should come from and whether
+  retrieval is actually required.
+
+* Do not answer the user's question.
+
+* Return only the structured output.
 """
