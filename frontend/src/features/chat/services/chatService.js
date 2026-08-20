@@ -17,9 +17,7 @@ const readTitlePayload = (data) => {
 };
 
 const buildStreamUrl = (path) => {
-    const baseURL = api.defaults.baseURL || "/api/v1";
-
-    return `${baseURL.replace(/\/$/, "")}${path}`;
+    return `/api/v1${path}`;
 };
 
 const buildStreamHeaders = () => {

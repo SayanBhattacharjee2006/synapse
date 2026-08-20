@@ -7,6 +7,7 @@ import {
 
 import { Button } from "@/components/ui";
 import { MessageBubble } from "@/features/chat";
+import StreamingLoader from "@/features/chat/components/StreamingLoader";
 import { cn } from "@/lib/utils";
 import { ArrowDown } from "lucide-react";
 
@@ -127,6 +128,10 @@ export default function MessageList({
               content={message.content}
             />
           ))}
+
+          {isStreaming && !streamingMessage && (
+            <StreamingLoader />
+          )}
 
           {isStreaming && streamingMessage && (
             <MessageBubble
