@@ -1,6 +1,7 @@
 from pydantic import BaseModel
 from enum import Enum
-from uuid import UUID 
+from uuid import UUID
+
 
 class RouterType(str, Enum):
     RAG = "rag"
@@ -8,15 +9,13 @@ class RouterType(str, Enum):
     BOTH = "both"
     NONE = "none"
 
-class EvaluatorResponseSchema(BaseModel):
-    router : RouterType
-    reasoning : str
-    confidence: float
 
-class OptimizedQueryResponse(BaseModel):
-    rag_query: str
-    web_query: str
-    reasoning: str
+class EvaluatorResponseSchema(BaseModel):
+    router: RouterType
+    rag_query: str | None = None
+    web_query: str | None = None
+
+
 
 class DocumentSummarySchema(BaseModel):
     document_id: UUID

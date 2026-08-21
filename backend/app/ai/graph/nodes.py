@@ -3,17 +3,15 @@ from app.ai.prompts.chat import (
     get_summariser_prompt,
     get_system_prompt,
     get_evaluator_prompt,
-    get_query_optimizer_prompt,
 )
 from app.ai.graph.state import GraphState
 from langchain_core.messages import (
     SystemMessage,
     RemoveMessage,
     HumanMessage,
-    AIMessage,
 )
 from langchain_core.messages.utils import count_tokens_approximately
-from app.ai.llm import llm, structured_llm, optimized_query_llm
+from app.ai.llm import llm, router_llm
 from app.ai.schema import RouterType
 from app.integretions.taviily.tavily import search_tavily, create_search_response
 from app.core.logging import logger
@@ -132,27 +130,42 @@ async def retreive_context_node(state: GraphState) -> dict:
 
 
 async def evaluator_node(state: GraphState) -> dict:
-
     query = state["messages"][-1].content
+
+    has_uploaded_documents = state.get(
+        "has_uploaded_documents",
+        False,
+    )
 
     logger.bind(
         conversation_id=str(state.get("conversation_id", "")),
-        has_uploaded_documents=state.get("has_uploaded_documents", False),
+        has_uploaded_documents=has_uploaded_documents,
     ).info("chat.evaluation.started")
-    evaluator_prompt = get_evaluator_prompt(state.get("has_uploaded_documents", False))
 
-    response = await structured_llm.ainvoke(
-        [SystemMessage(content=evaluator_prompt), HumanMessage(content=query)]
+    evaluator_prompt = get_evaluator_prompt(
+        has_uploaded_documents
+    )
+
+    response = await router_llm.ainvoke(
+        [
+            SystemMessage(content=evaluator_prompt),
+            HumanMessage(content=query),
+        ]
     )
 
     logger.bind(
         conversation_id=str(state.get("conversation_id", "")),
         router=response.router.value,
+        optimized_rag_query=response.rag_query,
+        optimized_web_query=response.web_query,
     ).info("chat.evaluation.completed")
+
     return {
         "router": response.router,
+        "optimized_rag_query": response.rag_query or query,
+        "optimized_web_query": response.web_query or query,
     }
-
+ 
 
 def route_after_evaluation(state: GraphState):
     decision = state.get("router", "none")
@@ -212,29 +225,3 @@ async def web_retreival_node(state: GraphState) -> dict:
         ).exception("web.retrieval.failed")
     return {"web_context": "", "web_found": False, "web_sources": []}
 
-
-async def query_optimizer_node(state: GraphState) -> dict:
-    query = state["messages"][-1].content
-    router = state.get("router", RouterType.NONE)
-    logger.bind(
-        conversation_id=str(state.get("conversation_id", "")),
-        router=router.value,
-    ).info("chat.query_optimization.started")
-    optimizer_prompt = get_query_optimizer_prompt()
-
-    response = await optimized_query_llm.ainvoke(
-        [
-            SystemMessage(content=optimizer_prompt),
-            HumanMessage(content=f"Router Decision: {router} \n user query: {query}"),
-        ]
-    )
-
-    logger.bind(
-        conversation_id=str(state.get("conversation_id", "")),
-        router=router.value,
-    ).info("chat.query_optimization.completed")
-
-    return {
-        "optimized_rag_query": response.rag_query,
-        "optimized_web_query": response.web_query,
-    }
