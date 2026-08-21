@@ -67,6 +67,9 @@ export const streamChat = async (
             method: "POST",
             body: JSON.stringify(data),
             headers: buildStreamHeaders(),
+            // Keep the same request alive when the tab loses focus. The
+            // library otherwise aborts it and opens a new POST on return.
+            openWhenHidden: true,
             onmessage: (event) => {
                 if (event.data === "[DONE]") {
                     onDone();

@@ -3,6 +3,7 @@ from langchain_openai import ChatOpenAI
 from app.ai.schema import EvaluatorResponseSchema, OptimizedQueryResponse
 from app.features.documents.summary.schemas import IntermediateSummary
 from app.features.documents.summary.schemas import DocumentProfile
+from langchain_groq import ChatGroq
 
 llm = ChatOpenAI(
         api_key=settings.OPENAI_API_KEY,
@@ -11,8 +12,13 @@ llm = ChatOpenAI(
         streaming=True
     )
 
+groq_llm = ChatGroq(
+    model="openai/gpt-oss-20b",
+    temperature=0,
+)
 
-structured_llm = llm.with_structured_output(EvaluatorResponseSchema)
+
+structured_llm = groq_llm.with_structured_output(EvaluatorResponseSchema)
 
 optimized_query_llm = llm.with_structured_output(OptimizedQueryResponse)
 
