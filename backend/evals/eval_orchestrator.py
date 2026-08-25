@@ -57,7 +57,7 @@ async def orchestrator(json_path: str):
     _, generated_outputs = await asyncio.gather(
         asyncio.to_thread(
             upload_dataset,
-            "synapse-golden-v3",
+            "synapse-golden-v4",
             valid_inputs,
             valid_outputs,
         ),

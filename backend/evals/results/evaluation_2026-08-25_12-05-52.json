@@ -1,0 +1,945 @@
+{
+  "total_tests": 40,
+  "metrics": {
+    "router_accuracy": 97.5,
+    "average_correctness": 4.6,
+    "average_relevance": 4.725,
+    "average_groundedness": 4.67741935483871,
+    "average_overall": 4.625,
+    "average_retrieval_relevance": 4.777777777777778,
+    "average_retrieval_completeness": 4.777777777777778
+  },
+  "by_route": {
+    "none": {
+      "tests": 8,
+      "router_accuracy": 100.0,
+      "average_correctness": 4.75,
+      "average_relevance": 5.0,
+      "average_groundedness": null,
+      "average_overall": 4.75,
+      "average_retrieval_relevance": null,
+      "average_retrieval_completeness": null
+    },
+    "rag": {
+      "tests": 18,
+      "router_accuracy": 94.44444444444444,
+      "average_correctness": 4.5,
+      "average_relevance": 4.666666666666667,
+      "average_groundedness": 4.705882352941177,
+      "average_overall": 4.555555555555555,
+      "average_retrieval_relevance": 4.777777777777778,
+      "average_retrieval_completeness": 4.777777777777778
+    },
+    "web": {
+      "tests": 9,
+      "router_accuracy": 100.0,
+      "average_correctness": 4.444444444444445,
+      "average_relevance": 4.444444444444445,
+      "average_groundedness": 4.444444444444445,
+      "average_overall": 4.444444444444445,
+      "average_retrieval_relevance": null,
+      "average_retrieval_completeness": null
+    },
+    "both": {
+      "tests": 5,
+      "router_accuracy": 100.0,
+      "average_correctness": 5.0,
+      "average_relevance": 5.0,
+      "average_groundedness": 5.0,
+      "average_overall": 5.0,
+      "average_retrieval_relevance": null,
+      "average_retrieval_completeness": null
+    }
+  },
+  "failures": {
+    "router": [
+      {
+        "question": "Besides the main revenue streams, what examples fall under the 'other' category?",
+        "expected_answer": "Among other items, revenue from subsidiary companies, youth and amateur levels, and donations.",
+        "generated_answer": "The 'other' category of revenue streams includes various income sources such as loyalty programs, merchandising, and revenues from club-owned facilities (like stadiums and training grounds).",
+        "expected_route": "rag",
+        "predicted_route": "none",
+        "router_evaluation": 0,
+        "answer_evaluation": {
+          "correctness": 2,
+          "relevance": 3,
+          "groundedness": null,
+          "overall": 2,
+          "reason": "The generated answer mentions some revenue sources that could be considered 'other', but they do not align with the expected examples of subsidiary companies, youth levels, and donations. Thus, it contains mostly incorrect information regarding the specific sources mentioned."
+        },
+        "retrieval_evaluation": {
+          "relevance": 1,
+          "completeness": 1
+        }
+      }
+    ],
+    "answer": [
+      {
+        "question": "Which season had the maximum Bundesliga transfer expenditure in the study, and what was the figure?",
+        "expected_answer": "2002/03, at €192.816 million.",
+        "generated_answer": "The season with the maximum Bundesliga transfer expenditure in the study was the 2001/02 season, with a figure of €173.214 million.",
+        "expected_route": "rag",
+        "predicted_route": "rag",
+        "router_evaluation": 1,
+        "answer_evaluation": {
+          "correctness": 1,
+          "relevance": 2,
+          "groundedness": 0,
+          "overall": 1,
+          "reason": "The generated answer incorrectly states that the maximum transfer expenditure occurred in the 2001/02 season, while the evidence indicates it was in 2002/03. Therefore, the answer is mostly incorrect given that it fails to provide the correct season and figure."
+        },
+        "retrieval_evaluation": {
+          "relevance": 5,
+          "completeness": 5
+        }
+      },
+      {
+        "question": "Besides the main revenue streams, what examples fall under the 'other' category?",
+        "expected_answer": "Among other items, revenue from subsidiary companies, youth and amateur levels, and donations.",
+        "generated_answer": "The 'other' category of revenue streams includes various income sources such as loyalty programs, merchandising, and revenues from club-owned facilities (like stadiums and training grounds).",
+        "expected_route": "rag",
+        "predicted_route": "none",
+        "router_evaluation": 0,
+        "answer_evaluation": {
+          "correctness": 2,
+          "relevance": 3,
+          "groundedness": null,
+          "overall": 2,
+          "reason": "The generated answer mentions some revenue sources that could be considered 'other', but they do not align with the expected examples of subsidiary companies, youth levels, and donations. Thus, it contains mostly incorrect information regarding the specific sources mentioned."
+        },
+        "retrieval_evaluation": {
+          "relevance": 1,
+          "completeness": 1
+        }
+      },
+      {
+        "question": "Which three players shared the most appearances in the 2025/26 UEFA Champions League?",
+        "expected_answer": "Willian Pacho, Désiré Doué, and Nuno Mendes were tied at 17 appearances.",
+        "generated_answer": "The three players who shared the most appearances in the 2025/26 UEFA Champions League were Cristiano Ronaldo, Lionel Messi, and Iker Casillas, each appearing in a total of **187 matches**.",
+        "expected_route": "web",
+        "predicted_route": "web",
+        "router_evaluation": 1,
+        "answer_evaluation": {
+          "correctness": 0,
+          "relevance": 0,
+          "groundedness": 0,
+          "overall": 0,
+          "reason": "The generated answer is completely incorrect as it names players who did not share the most appearances in the 2025/26 UEFA Champions League. It does not address the question at all, and there is no support from the provided evidence for the claims made."
+        },
+        "retrieval_evaluation": null
+      }
+    ],
+    "low_groundedness": [
+      {
+        "question": "Which season had the maximum Bundesliga transfer expenditure in the study, and what was the figure?",
+        "expected_answer": "2002/03, at €192.816 million.",
+        "generated_answer": "The season with the maximum Bundesliga transfer expenditure in the study was the 2001/02 season, with a figure of €173.214 million.",
+        "expected_route": "rag",
+        "predicted_route": "rag",
+        "router_evaluation": 1,
+        "answer_evaluation": {
+          "correctness": 1,
+          "relevance": 2,
+          "groundedness": 0,
+          "overall": 1,
+          "reason": "The generated answer incorrectly states that the maximum transfer expenditure occurred in the 2001/02 season, while the evidence indicates it was in 2002/03. Therefore, the answer is mostly incorrect given that it fails to provide the correct season and figure."
+        },
+        "retrieval_evaluation": {
+          "relevance": 5,
+          "completeness": 5
+        }
+      },
+      {
+        "question": "Which three players shared the most appearances in the 2025/26 UEFA Champions League?",
+        "expected_answer": "Willian Pacho, Désiré Doué, and Nuno Mendes were tied at 17 appearances.",
+        "generated_answer": "The three players who shared the most appearances in the 2025/26 UEFA Champions League were Cristiano Ronaldo, Lionel Messi, and Iker Casillas, each appearing in a total of **187 matches**.",
+        "expected_route": "web",
+        "predicted_route": "web",
+        "router_evaluation": 1,
+        "answer_evaluation": {
+          "correctness": 0,
+          "relevance": 0,
+          "groundedness": 0,
+          "overall": 0,
+          "reason": "The generated answer is completely incorrect as it names players who did not share the most appearances in the 2025/26 UEFA Champions League. It does not address the question at all, and there is no support from the provided evidence for the claims made."
+        },
+        "retrieval_evaluation": null
+      }
+    ],
+    "low_relevance": [
+      {
+        "question": "Which season had the maximum Bundesliga transfer expenditure in the study, and what was the figure?",
+        "expected_answer": "2002/03, at €192.816 million.",
+        "generated_answer": "The season with the maximum Bundesliga transfer expenditure in the study was the 2001/02 season, with a figure of €173.214 million.",
+        "expected_route": "rag",
+        "predicted_route": "rag",
+        "router_evaluation": 1,
+        "answer_evaluation": {
+          "correctness": 1,
+          "relevance": 2,
+          "groundedness": 0,
+          "overall": 1,
+          "reason": "The generated answer incorrectly states that the maximum transfer expenditure occurred in the 2001/02 season, while the evidence indicates it was in 2002/03. Therefore, the answer is mostly incorrect given that it fails to provide the correct season and figure."
+        },
+        "retrieval_evaluation": {
+          "relevance": 5,
+          "completeness": 5
+        }
+      },
+      {
+        "question": "Which three players shared the most appearances in the 2025/26 UEFA Champions League?",
+        "expected_answer": "Willian Pacho, Désiré Doué, and Nuno Mendes were tied at 17 appearances.",
+        "generated_answer": "The three players who shared the most appearances in the 2025/26 UEFA Champions League were Cristiano Ronaldo, Lionel Messi, and Iker Casillas, each appearing in a total of **187 matches**.",
+        "expected_route": "web",
+        "predicted_route": "web",
+        "router_evaluation": 1,
+        "answer_evaluation": {
+          "correctness": 0,
+          "relevance": 0,
+          "groundedness": 0,
+          "overall": 0,
+          "reason": "The generated answer is completely incorrect as it names players who did not share the most appearances in the 2025/26 UEFA Champions League. It does not address the question at all, and there is no support from the provided evidence for the claims made."
+        },
+        "retrieval_evaluation": null
+      }
+    ],
+    "low_retrieval_relevance": [
+      {
+        "question": "Besides the main revenue streams, what examples fall under the 'other' category?",
+        "expected_answer": "Among other items, revenue from subsidiary companies, youth and amateur levels, and donations.",
+        "generated_answer": "The 'other' category of revenue streams includes various income sources such as loyalty programs, merchandising, and revenues from club-owned facilities (like stadiums and training grounds).",
+        "expected_route": "rag",
+        "predicted_route": "none",
+        "router_evaluation": 0,
+        "answer_evaluation": {
+          "correctness": 2,
+          "relevance": 3,
+          "groundedness": null,
+          "overall": 2,
+          "reason": "The generated answer mentions some revenue sources that could be considered 'other', but they do not align with the expected examples of subsidiary companies, youth levels, and donations. Thus, it contains mostly incorrect information regarding the specific sources mentioned."
+        },
+        "retrieval_evaluation": {
+          "relevance": 1,
+          "completeness": 1
+        }
+      }
+    ],
+    "low_retrieval_completeness": [
+      {
+        "question": "Besides the main revenue streams, what examples fall under the 'other' category?",
+        "expected_answer": "Among other items, revenue from subsidiary companies, youth and amateur levels, and donations.",
+        "generated_answer": "The 'other' category of revenue streams includes various income sources such as loyalty programs, merchandising, and revenues from club-owned facilities (like stadiums and training grounds).",
+        "expected_route": "rag",
+        "predicted_route": "none",
+        "router_evaluation": 0,
+        "answer_evaluation": {
+          "correctness": 2,
+          "relevance": 3,
+          "groundedness": null,
+          "overall": 2,
+          "reason": "The generated answer mentions some revenue sources that could be considered 'other', but they do not align with the expected examples of subsidiary companies, youth levels, and donations. Thus, it contains mostly incorrect information regarding the specific sources mentioned."
+        },
+        "retrieval_evaluation": {
+          "relevance": 1,
+          "completeness": 1
+        }
+      }
+    ]
+  },
+  "results": [
+    {
+      "question": "What is 17 × 6?",
+      "expected_answer": "102",
+      "generated_answer": "17 × 6 equals 102.",
+      "expected_route": "none",
+      "predicted_route": "none",
+      "router_evaluation": 1,
+      "answer_evaluation": {
+        "correctness": 5,
+        "relevance": 5,
+        "groundedness": null,
+        "overall": 5,
+        "reason": "The generated answer is completely correct, accurately stating that 17 × 6 equals 102, which matches the expected answer. It is also directly relevant to the question asked."
+      },
+      "retrieval_evaluation": null
+    },
+    {
+      "question": "Explain what a Python dictionary is.",
+      "expected_answer": "A mutable key-value data structure in Python.",
+      "generated_answer": "A Python dictionary is a built-in data type that allows you to store data in key-value pairs. It is unordered, mutable, and indexed, meaning that you can change its contents after creation and access values via their corresponding keys.\n\nHere are some key features of Python dictionaries:\n\n1. **Key-Value Pairs**: Each entry in a dictionary consists of a key and a value. The key is unique and is used to access the associated value.\n2. **Mutable**: You can add, remove, and change items after the dictionary has been created.\n3. **Unordered**: The order of items in a dictionary is not guaranteed to be the same as the order in which they were added (though as of Python 3.7, dictionaries maintain insertion order).\n4. **Accessing Values**: You can access a value by referencing its key, using square brackets or the `get()` method.\n\nExample of a Python dictionary:\n\n```python\n# Creating a dictionary\nstudent = {\n    \"name\": \"Alice\",\n    \"age\": 21,\n    \"major\": \"Computer Science\"\n}\n\n# Accessing a value\nprint(student[\"name\"])  # Output: Alice\n\n# Adding a new key-value pair\nstudent[\"graduation_year\"] = 2023\n\n# Removing a key-value pair\ndel student[\"age\"]\n```\n\nIn this example, `student` is a dictionary with keys like \"name\", \"age\", and \"major\", each associated with their respective values.",
+      "expected_route": "none",
+      "predicted_route": "none",
+      "router_evaluation": 1,
+      "answer_evaluation": {
+        "correctness": 4,
+        "relevance": 5,
+        "groundedness": null,
+        "overall": 4,
+        "reason": "The generated answer provides a comprehensive explanation of a Python dictionary, covering its key features and usage, which aligns well with the expected answer. However, it includes additional details that, while informative, are not strictly necessary for the basic definition, hence the score of 4 for correctness."
+      },
+      "retrieval_evaluation": null
+    },
+    {
+      "question": "What does HTTP status code 404 mean?",
+      "expected_answer": "The requested resource was not found.",
+      "generated_answer": "HTTP status code 404 means \"Not Found.\" It indicates that the server could not find the requested resource. This typically occurs when the URL is incorrect or the resource has been moved or deleted. In web applications, a 404 error is often displayed as a \"404 Not Found\" page, informing the user that the requested page does not exist.",
+      "expected_route": "none",
+      "predicted_route": "none",
+      "router_evaluation": 1,
+      "answer_evaluation": {
+        "correctness": 5,
+        "relevance": 5,
+        "groundedness": null,
+        "overall": 5,
+        "reason": "The generated answer accurately explains the meaning of HTTP status code 404, including its implications and typical usage. It directly addresses the question with no factual errors and is completely relevant."
+      },
+      "retrieval_evaluation": null
+    },
+    {
+      "question": "Write a SQL query that selects all rows from a users table.",
+      "expected_answer": "SELECT * FROM users;",
+      "generated_answer": "Here is a SQL query that selects all rows from a table named `users`:\n\n```sql\nSELECT * FROM users;\n```\n\nThis query retrieves all columns and all rows from the `users` table.",
+      "expected_route": "none",
+      "predicted_route": "none",
+      "router_evaluation": 1,
+      "answer_evaluation": {
+        "correctness": 5,
+        "relevance": 5,
+        "groundedness": null,
+        "overall": 5,
+        "reason": "The generated answer accurately provides the expected SQL query and explains its function clearly. It fully addresses the question without any errors or irrelevant information."
+      },
+      "retrieval_evaluation": null
+    },
+    {
+      "question": "What is the difference between a process and a thread?",
+      "expected_answer": "A process has its own address space, while threads within a process share that address space and resources.",
+      "generated_answer": "A process and a thread are both fundamental concepts in operating systems, but they have distinct differences:\n\n### Process:\n1. **Definition**: A process is an independent program in execution, which has its own memory space, system resources, and execution context.\n2. **Memory**: Each process has its own memory allocation, including code, data, and stack segments. Processes do not share memory space.\n3. **Isolation**: Processes are isolated from one another, meaning that one process cannot directly access the memory or resources of another process.\n4. **Overhead**: Creating and managing processes is more resource-intensive and has higher overhead due to the need for separate memory allocation and context switching.\n5. **Communication**: Inter-process communication (IPC) mechanisms (like pipes, message queues, or shared memory) are required for processes to communicate with each other.\n\n### Thread:\n1. **Definition**: A thread is the smallest unit of execution within a process. Multiple threads can exist within a single process and share the same memory space.\n2. **Memory**: Threads within the same process share the same memory and resources, including code, data, and open files, but each thread has its own stack and registers.\n3. **Isolation**: Threads are not isolated; they can easily communicate and share data with other threads of the same process.\n4. **Overhead**: Creating and managing threads typically has less overhead compared to processes, making thread creation faster and more efficient.\n5. **Communication**: Since threads share the same memory space, communication between threads is simpler and can be done directly through shared variables.\n\n### Summary:\nIn summary, a process is an independent unit of execution with its own resources, while a thread is a lightweight unit of execution that exists within a process and shares resources with other threads. This allows threads to communicate more easily, but it also introduces challenges such as synchronization and data consistency.",
+      "expected_route": "none",
+      "predicted_route": "none",
+      "router_evaluation": 1,
+      "answer_evaluation": {
+        "correctness": 4,
+        "relevance": 5,
+        "groundedness": null,
+        "overall": 4,
+        "reason": "The generated answer accurately explains the differences between a process and a thread, making it mostly correct with minor omissions regarding the specific phrasing of 'address space.' It directly addresses the question without unnecessary information."
+      },
+      "retrieval_evaluation": null
+    },
+    {
+      "question": "What is the capital of Japan?",
+      "expected_answer": "Tokyo.",
+      "generated_answer": "The capital of Japan is Tokyo.",
+      "expected_route": "none",
+      "predicted_route": "none",
+      "router_evaluation": 1,
+      "answer_evaluation": {
+        "correctness": 5,
+        "relevance": 5,
+        "groundedness": null,
+        "overall": 5,
+        "reason": "The generated answer is completely correct as it accurately states that the capital of Japan is Tokyo, which matches the expected answer. It directly addresses the question without any irrelevant information."
+      },
+      "retrieval_evaluation": null
+    },
+    {
+      "question": "How do you reverse a string in Python?",
+      "expected_answer": "Use slicing: s[::-1].",
+      "generated_answer": "You can reverse a string in Python using several methods. Here are a few common approaches:\n\n1. **Using Slicing**:\n   ```python\n   original_string = \"Hello\"\n   reversed_string = original_string[::-1]\n   print(reversed_string)  # Output: olleH\n   ```\n\n2. **Using the `reversed()` Function**:\n   ```python\n   original_string = \"Hello\"\n   reversed_string = ''.join(reversed(original_string))\n   print(reversed_string)  # Output: olleH\n   ```\n\n3. **Using a Loop**:\n   ```python\n   original_string = \"Hello\"\n   reversed_string = ''\n   for char in original_string:\n       reversed_string = char + reversed_string\n   print(reversed_string)  # Output: olleH\n   ```\n\nEach of these methods achieves the same result, reversing the original string. The slicing method is the most concise and commonly used.",
+      "expected_route": "none",
+      "predicted_route": "none",
+      "router_evaluation": 1,
+      "answer_evaluation": {
+        "correctness": 5,
+        "relevance": 5,
+        "groundedness": null,
+        "overall": 5,
+        "reason": "The generated answer accurately describes multiple methods to reverse a string in Python, including slicing, which was the expected answer. It is comprehensive and focuses directly on the question."
+      },
+      "retrieval_evaluation": null
+    },
+    {
+      "question": "What is 18% of 250?",
+      "expected_answer": "45",
+      "generated_answer": "18% of 250 can be calculated by multiplying 250 by 0.18:\n\n\\[\n250 \\times 0.18 = 45\n\\]\n\nTherefore, 18% of 250 is 45.",
+      "expected_route": "none",
+      "predicted_route": "none",
+      "router_evaluation": 1,
+      "answer_evaluation": {
+        "correctness": 5,
+        "relevance": 5,
+        "groundedness": null,
+        "overall": 5,
+        "reason": "The generated answer accurately explains how to calculate 18% of 250 and correctly states the result as 45, which matches the expected answer. It directly addresses the question without unnecessary information."
+      },
+      "retrieval_evaluation": null
+    },
+    {
+      "question": "By what percentage did Bundesliga revenue excluding transfers increase from 1998/99 to 2004/05?",
+      "expected_answer": "114%.",
+      "generated_answer": "To calculate the percentage increase in Bundesliga revenue excluding transfers from the 1998/99 season to the 2004/05 season, you can use the formula:\n\n\\[\n\\text{Percentage Increase} = \\frac{\\text{New Value} - \\text{Old Value}}{\\text{Old Value}} \\times 100\n\\]\n\nFrom the provided data:\n- Revenue for 1998/99: €576.8 million\n- Revenue for 2004/05: €1,236.5 million\n\nNow, substituting the values:\n\n\\[\n\\text{Percentage Increase} = \\frac{1,236.5 - 576.8}{576.8} \\times 100\n\\]\n\\[\n\\text{Percentage Increase} = \\frac{659.7}{576.8} \\times 100 \\approx 114.36\\%\n\\]\n\nTherefore, Bundesliga revenue excluding transfers increased by approximately 114.36% from 1998/99 to 2004/05.",
+      "expected_route": "rag",
+      "predicted_route": "rag",
+      "router_evaluation": 1,
+      "answer_evaluation": {
+        "correctness": 5,
+        "relevance": 5,
+        "groundedness": 5,
+        "overall": 5,
+        "reason": "The generated answer correctly calculates the percentage increase in Bundesliga revenue from 1998/99 to 2004/05 and arrives at a value (approximately 114.36%) that is consistent with the expected answer of 114%. It also includes the appropriate formula and supporting calculations, making it both accurate and relevant. The calculations are fully supported by the retrieved document context, which confirms the revenue figures and the percentage increase."
+      },
+      "retrieval_evaluation": {
+        "relevance": 5,
+        "completeness": 5
+      }
+    },
+    {
+      "question": "Which season had the maximum Bundesliga transfer expenditure in the study, and what was the figure?",
+      "expected_answer": "2002/03, at €192.816 million.",
+      "generated_answer": "The season with the maximum Bundesliga transfer expenditure in the study was the 2001/02 season, with a figure of €173.214 million.",
+      "expected_route": "rag",
+      "predicted_route": "rag",
+      "router_evaluation": 1,
+      "answer_evaluation": {
+        "correctness": 1,
+        "relevance": 2,
+        "groundedness": 0,
+        "overall": 1,
+        "reason": "The generated answer incorrectly states that the maximum transfer expenditure occurred in the 2001/02 season, while the evidence indicates it was in 2002/03. Therefore, the answer is mostly incorrect given that it fails to provide the correct season and figure."
+      },
+      "retrieval_evaluation": {
+        "relevance": 5,
+        "completeness": 5
+      }
+    },
+    {
+      "question": "What was the Bundesliga's net transfer-activity result for 2002/03?",
+      "expected_answer": "−€162.918 million.",
+      "generated_answer": "The Bundesliga's net transfer-activity result for the 2002/03 season was -€162.918 million. This indicates that transfer expenditure exceeded transfer revenue by this amount.",
+      "expected_route": "rag",
+      "predicted_route": "rag",
+      "router_evaluation": 1,
+      "answer_evaluation": {
+        "correctness": 5,
+        "relevance": 5,
+        "groundedness": 5,
+        "overall": 5,
+        "reason": "The generated answer accurately states the Bundesliga's net transfer-activity result for the 2002/03 season as -€162.918 million, which matches the expected answer perfectly. It also provides a correct interpretation of this figure, stating that transfer expenditure exceeded revenue by this amount. The answer is entirely relevant to the question and is strongly supported by the retrieved document context, which confirms the net result for that season."
+      },
+      "retrieval_evaluation": {
+        "relevance": 5,
+        "completeness": 5
+      }
+    },
+    {
+      "question": "How many revenue streams did the DFL distinguish when transfers were included?",
+      "expected_answer": "Six categories: match day, advertising/sponsoring, TV, merchandising, transfers, and other.",
+      "generated_answer": "The DFL distinguished six revenue streams when transfers were included. These streams are match day, advertising/sponsoring, TV, merchandising, transfers, and other.",
+      "expected_route": "rag",
+      "predicted_route": "rag",
+      "router_evaluation": 1,
+      "answer_evaluation": {
+        "correctness": 5,
+        "relevance": 5,
+        "groundedness": 5,
+        "overall": 5,
+        "reason": "The generated answer accurately restates that the DFL distinguished six revenue streams that include transfers, matching the expected answer perfectly. It is focused and directly addresses the question without any irrelevant information. Furthermore, all claims made in the answer are well-supported by the retrieved document context, which confirms the six categories of revenue."
+      },
+      "retrieval_evaluation": {
+        "relevance": 5,
+        "completeness": 5
+      }
+    },
+    {
+      "question": "How many distinct Bundesliga clubs reached the UCL between 1996/97 and 2004/05?",
+      "expected_answer": "Nine different clubs.",
+      "generated_answer": "Nine distinct Bundesliga clubs reached the UEFA Champions League (UCL) between the 1996/97 and 2004/05 seasons.",
+      "expected_route": "rag",
+      "predicted_route": "rag",
+      "router_evaluation": 1,
+      "answer_evaluation": {
+        "correctness": 5,
+        "relevance": 5,
+        "groundedness": 5,
+        "overall": 5,
+        "reason": "The generated answer is completely correct, accurately reflecting the expected answer of 'nine different clubs.' It is also directly relevant to the question asked and is fully supported by the retrieved evidence, which confirms that nine Bundesliga clubs qualified for the UCL during the specified period."
+      },
+      "retrieval_evaluation": {
+        "relevance": 5,
+        "completeness": 5
+      }
+    },
+    {
+      "question": "Across 1996/97 through 2004/05, how often did Bayern Munich appear in the UCL?",
+      "expected_answer": "Eight times out of a possible nine.",
+      "generated_answer": "Bayern Munich appeared in the UEFA Champions League (UCL) eight times from the 1996/97 through the 2004/05 seasons.",
+      "expected_route": "rag",
+      "predicted_route": "rag",
+      "router_evaluation": 1,
+      "answer_evaluation": {
+        "correctness": 5,
+        "relevance": 5,
+        "groundedness": 5,
+        "overall": 5,
+        "reason": "The generated answer accurately states that Bayern Munich appeared in the UCL eight times from 1996/97 to 2004/05, which matches the expected answer perfectly. It is relevant and directly addresses the question without unnecessary information. Furthermore, the claim is strongly supported by the provided evidence, confirming the participation count."
+      },
+      "retrieval_evaluation": {
+        "relevance": 5,
+        "completeness": 5
+      }
+    },
+    {
+      "question": "How many UCL qualifications did Bayer Leverkusen have in the 1996/97–2004/05 period?",
+      "expected_answer": "Six times.",
+      "generated_answer": "Bayer Leverkusen had six UEFA Champions League (UCL) qualifications in the 1996/97 to 2004/05 period.",
+      "expected_route": "rag",
+      "predicted_route": "rag",
+      "router_evaluation": 1,
+      "answer_evaluation": {
+        "correctness": 5,
+        "relevance": 5,
+        "groundedness": 5,
+        "overall": 5,
+        "reason": "The generated answer accurately states that Bayer Leverkusen had six UCL qualifications during the specified period, which matches the expected answer perfectly. It directly addresses the question without any extraneous information, and all claims made are supported by the retrieved document context."
+      },
+      "retrieval_evaluation": {
+        "relevance": 5,
+        "completeness": 5
+      }
+    },
+    {
+      "question": "How often did Borussia Dortmund qualify for the UCL over that period?",
+      "expected_answer": "Five times.",
+      "generated_answer": "Borussia Dortmund qualified for the UEFA Champions League (UCL) five times over the period from 1996/97 to 2004/05.",
+      "expected_route": "rag",
+      "predicted_route": "rag",
+      "router_evaluation": 1,
+      "answer_evaluation": {
+        "correctness": 5,
+        "relevance": 5,
+        "groundedness": 5,
+        "overall": 5,
+        "reason": "The generated answer accurately states that Borussia Dortmund qualified for the UCL five times during the specified period, which matches the expected answer. It also provides the relevant context of the time frame (1996/97 to 2004/05). Additionally, all claims made are supported by the provided document context."
+      },
+      "retrieval_evaluation": {
+        "relevance": 5,
+        "completeness": 5
+      }
+    },
+    {
+      "question": "Which German clubs were runners-up in the UCL finals discussed, and who beat them?",
+      "expected_answer": "Bayern Munich lost to Manchester United in 1998/99, and Bayer Leverkusen lost to Real Madrid in 2001/02.",
+      "generated_answer": "The German clubs that were runners-up in the UEFA Champions League (UCL) finals discussed are:\n\n1. **Borussia Dortmund** - Runners-up in the 1996/97 final, they were beaten by Juventus.\n2. **Bayern Munich** - Runners-up in the 1998/99 final, they were beaten by Manchester United.\n3. **Bayer Leverkusen** - Runners-up in the 2001/02 final, they were beaten by Real Madrid.",
+      "expected_route": "rag",
+      "predicted_route": "rag",
+      "router_evaluation": 1,
+      "answer_evaluation": {
+        "correctness": 3,
+        "relevance": 4,
+        "groundedness": 5,
+        "overall": 4,
+        "reason": "The generated answer includes one correct but irrelevant detail about Borussia Dortmund being the runners-up in 1996/97, which was not asked for in the question. The answers for Bayern Munich and Bayer Leverkusen are correct and match the expected answer. Therefore, it is partially correct overall. The answer is relevant to the question but includes unnecessary information. All factual claims are supported by the retrieved document context."
+      },
+      "retrieval_evaluation": {
+        "relevance": 5,
+        "completeness": 5
+      }
+    },
+    {
+      "question": "What were the two Gini coefficients reported for UCL-qualified clubs versus all Bundesliga clubs?",
+      "expected_answer": "0.529 among UCL-qualified teams and 0.764 among all 18 Bundesliga teams.",
+      "generated_answer": "The Gini coefficients reported were:\n\n- For UCL-qualified clubs: **0.529**\n- For all Bundesliga clubs: **0.764**",
+      "expected_route": "rag",
+      "predicted_route": "rag",
+      "router_evaluation": 1,
+      "answer_evaluation": {
+        "correctness": 5,
+        "relevance": 5,
+        "groundedness": 5,
+        "overall": 5,
+        "reason": "The generated answer accurately presents the two Gini coefficients as reported in the provided context: 0.529 for UCL-qualified clubs and 0.764 for all Bundesliga clubs. It directly addresses the question without any errors or omissions, and all claims are supported by the retrieved document."
+      },
+      "retrieval_evaluation": {
+        "relevance": 5,
+        "completeness": 5
+      }
+    },
+    {
+      "question": "In 2004/05, how did the average budget shares of UCL clubs compare with clubs finishing fourth through ninth?",
+      "expected_answer": "UCL clubs averaged 7.1%, while clubs finishing fourth through ninth averaged 6.7%.",
+      "generated_answer": "In the 2004/05 season, the average budget share of UEFA Champions League (UCL) clubs was **7.1%**, while the average budget share of clubs finishing fourth to ninth was **6.7%**. This indicates that UCL clubs had a slightly higher average budget share compared to those finishing in the fourth to ninth positions.",
+      "expected_route": "rag",
+      "predicted_route": "rag",
+      "router_evaluation": 1,
+      "answer_evaluation": {
+        "correctness": 5,
+        "relevance": 5,
+        "groundedness": 5,
+        "overall": 5,
+        "reason": "The generated answer accurately states the average budget shares for UCL clubs and clubs finishing fourth to ninth, aligning perfectly with the expected answer. It is also directly relevant to the question and fully supported by the retrieved document context."
+      },
+      "retrieval_evaluation": {
+        "relevance": 5,
+        "completeness": 5
+      }
+    },
+    {
+      "question": "What was Bundesliga revenue excluding transfers in 2004/05?",
+      "expected_answer": "€1,236.5 million",
+      "generated_answer": "The Bundesliga revenue excluding transfers in the 2004/05 season was €1,236.5 million.",
+      "expected_route": "rag",
+      "predicted_route": "rag",
+      "router_evaluation": 1,
+      "answer_evaluation": {
+        "correctness": 5,
+        "relevance": 5,
+        "groundedness": 5,
+        "overall": 5,
+        "reason": "The generated answer is completely correct, as it accurately states the Bundesliga revenue excluding transfers for the 2004/05 season as €1,236.5 million, matching the expected answer. It directly addresses the question without unnecessary information, and all claims are supported by the retrieved document context."
+      },
+      "retrieval_evaluation": {
+        "relevance": 5,
+        "completeness": 5
+      }
+    },
+    {
+      "question": "How much TV revenue did the Bundesliga generate in 2004/05?",
+      "expected_answer": "€321.7 million.",
+      "generated_answer": "The Bundesliga generated €321.7 million in TV revenue in the 2004/05 season.",
+      "expected_route": "rag",
+      "predicted_route": "rag",
+      "router_evaluation": 1,
+      "answer_evaluation": {
+        "correctness": 5,
+        "relevance": 5,
+        "groundedness": 5,
+        "overall": 5,
+        "reason": "The generated answer accurately states that the Bundesliga generated €321.7 million in TV revenue for the 2004/05 season, which matches the expected answer perfectly. It directly addresses the question without any unnecessary information, and the claim is fully supported by the provided document context."
+      },
+      "retrieval_evaluation": {
+        "relevance": 5,
+        "completeness": 5
+      }
+    },
+    {
+      "question": "When was the highest TV-revenue share recorded, and how large was it?",
+      "expected_answer": "2000/01, at 45%.",
+      "generated_answer": "The highest TV-revenue share for the Bundesliga was recorded in the 2000/01 season, reaching a peak of **45%**.",
+      "expected_route": "rag",
+      "predicted_route": "rag",
+      "router_evaluation": 1,
+      "answer_evaluation": {
+        "correctness": 5,
+        "relevance": 5,
+        "groundedness": 5,
+        "overall": 5,
+        "reason": "The generated answer is completely correct, accurately stating that the highest TV-revenue share was recorded in the 2000/01 season at 45%. It directly addresses the question with no extraneous information. The claims made in the answer are fully supported by the retrieved evidence, which confirms that the peak TV revenue share was indeed 45% in that season."
+      },
+      "retrieval_evaluation": {
+        "relevance": 5,
+        "completeness": 5
+      }
+    },
+    {
+      "question": "What was the percentage growth in advertising and sponsorship revenue across the seven seasons?",
+      "expected_answer": "167%.",
+      "generated_answer": "The percentage growth in advertising and sponsorship revenue across the seven seasons was **167%**.",
+      "expected_route": "rag",
+      "predicted_route": "rag",
+      "router_evaluation": 1,
+      "answer_evaluation": {
+        "correctness": 5,
+        "relevance": 5,
+        "groundedness": 5,
+        "overall": 5,
+        "reason": "The generated answer correctly states the percentage growth in advertising and sponsorship revenue as 167%, which matches the expected answer. It is directly relevant to the question and is fully supported by the retrieved document context, which explicitly states this figure."
+      },
+      "retrieval_evaluation": {
+        "relevance": 5,
+        "completeness": 5
+      }
+    },
+    {
+      "question": "How much transfer spending per club did the paper report on average?",
+      "expected_answer": "€7.8 million per club.",
+      "generated_answer": "The paper reported an average transfer spending of **€7.8 million** per club.",
+      "expected_route": "rag",
+      "predicted_route": "rag",
+      "router_evaluation": 1,
+      "answer_evaluation": {
+        "correctness": 5,
+        "relevance": 5,
+        "groundedness": 5,
+        "overall": 5,
+        "reason": "The generated answer accurately states the average transfer spending per club as €7.8 million, which matches the expected answer perfectly. It directly addresses the question without any irrelevant information, and the claim is fully supported by the retrieved document context."
+      },
+      "retrieval_evaluation": {
+        "relevance": 5,
+        "completeness": 5
+      }
+    },
+    {
+      "question": "Besides the main revenue streams, what examples fall under the 'other' category?",
+      "expected_answer": "Among other items, revenue from subsidiary companies, youth and amateur levels, and donations.",
+      "generated_answer": "The 'other' category of revenue streams includes various income sources such as loyalty programs, merchandising, and revenues from club-owned facilities (like stadiums and training grounds).",
+      "expected_route": "rag",
+      "predicted_route": "none",
+      "router_evaluation": 0,
+      "answer_evaluation": {
+        "correctness": 2,
+        "relevance": 3,
+        "groundedness": null,
+        "overall": 2,
+        "reason": "The generated answer mentions some revenue sources that could be considered 'other', but they do not align with the expected examples of subsidiary companies, youth levels, and donations. Thus, it contains mostly incorrect information regarding the specific sources mentioned."
+      },
+      "retrieval_evaluation": {
+        "relevance": 1,
+        "completeness": 1
+      }
+    },
+    {
+      "question": "According to the paper, what was Bundesliga revenue excluding transfers in 1998/99?",
+      "expected_answer": "€576.8 million",
+      "generated_answer": "The Bundesliga revenue excluding transfers in the 1998/99 season was **€576.8 million**.",
+      "expected_route": "rag",
+      "predicted_route": "rag",
+      "router_evaluation": 1,
+      "answer_evaluation": {
+        "correctness": 5,
+        "relevance": 5,
+        "groundedness": 5,
+        "overall": 5,
+        "reason": "The generated answer accurately states the Bundesliga revenue excluding transfers for the 1998/99 season as €576.8 million, which matches the expected answer perfectly. The relevance is high as it directly answers the question without unnecessary information. Groundedness is also strong, as the answer is supported by the retrieved document context that explicitly provides this figure."
+      },
+      "retrieval_evaluation": {
+        "relevance": 5,
+        "completeness": 5
+      }
+    },
+    {
+      "question": "Who won the 2025/26 UEFA Champions League?",
+      "expected_answer": "Paris Saint-Germain won the 2025/26 UEFA Champions League.",
+      "generated_answer": "Paris Saint-Germain won the 2025/26 UEFA Champions League, defeating Arsenal in the final. The match ended 1-1, with PSG winning 4-3 on penalties.",
+      "expected_route": "web",
+      "predicted_route": "web",
+      "router_evaluation": 1,
+      "answer_evaluation": {
+        "correctness": 5,
+        "relevance": 5,
+        "groundedness": 5,
+        "overall": 5,
+        "reason": "The generated answer accurately states that Paris Saint-Germain won the 2025/26 UEFA Champions League and provides additional context about the final match against Arsenal, including the score and penalty shootout details. All claims are supported by the provided web context."
+      },
+      "retrieval_evaluation": null
+    },
+    {
+      "question": "What was the score between PSG and Arsenal before the penalties in the 2025/26 Champions League final?",
+      "expected_answer": "Paris Saint-Germain and Arsenal drew 1–1 before the penalty shootout; PSG won 4–3 on penalties.",
+      "generated_answer": "The score between PSG and Arsenal before the penalties in the 2025/26 Champions League final was 1-1.",
+      "expected_route": "web",
+      "predicted_route": "web",
+      "router_evaluation": 1,
+      "answer_evaluation": {
+        "correctness": 5,
+        "relevance": 5,
+        "groundedness": 5,
+        "overall": 5,
+        "reason": "The generated answer correctly states that the score between PSG and Arsenal before penalties was 1-1, which exactly matches the expected answer. Additionally, it is directly relevant to the question asked and is fully supported by the provided web context."
+      },
+      "retrieval_evaluation": null
+    },
+    {
+      "question": "Which stadium hosted the 2025/26 Champions League final?",
+      "expected_answer": "At the Puskás Aréna in Budapest, Hungary.",
+      "generated_answer": "The 2025/26 Champions League final was hosted at the Puskás Aréna in Budapest, Hungary.",
+      "expected_route": "web",
+      "predicted_route": "web",
+      "router_evaluation": 1,
+      "answer_evaluation": {
+        "correctness": 5,
+        "relevance": 5,
+        "groundedness": 5,
+        "overall": 5,
+        "reason": "The generated answer is completely correct as it accurately states that the 2025/26 Champions League final was hosted at the Puskás Aréna in Budapest, Hungary. It directly addresses the question without any irrelevant information. Furthermore, all claims in the answer are supported by the provided web context, confirming the venue and location."
+      },
+      "retrieval_evaluation": null
+    },
+    {
+      "question": "When was the 2025/26 Champions League final scheduled to kick off?",
+      "expected_answer": "18:00 CEST on 30 May 2026.",
+      "generated_answer": "The 2025/26 Champions League final was scheduled to kick off on Saturday, May 30, 2026, at 18:00 CEST.",
+      "expected_route": "web",
+      "predicted_route": "web",
+      "router_evaluation": 1,
+      "answer_evaluation": {
+        "correctness": 5,
+        "relevance": 5,
+        "groundedness": 5,
+        "overall": 5,
+        "reason": "The generated answer accurately states the kick-off time and date for the 2025/26 Champions League final, matching perfectly with the expected answer. It is focused, relevant, and all claims are supported by the provided web context."
+      },
+      "retrieval_evaluation": null
+    },
+    {
+      "question": "Who finished as the leading scorer in the 2025/26 UEFA Champions League, and how many goals did he score?",
+      "expected_answer": "Kylian Mbappé, with 15 goals.",
+      "generated_answer": "Kylian Mbappé finished as the leading scorer in the 2025/26 UEFA Champions League, scoring **15 goals**.",
+      "expected_route": "web",
+      "predicted_route": "web",
+      "router_evaluation": 1,
+      "answer_evaluation": {
+        "correctness": 5,
+        "relevance": 5,
+        "groundedness": 5,
+        "overall": 5,
+        "reason": "The generated answer accurately states that Kylian Mbappé finished as the leading scorer in the 2025/26 UEFA Champions League with 15 goals, matching the expected answer perfectly. It directly addresses the question without any unnecessary information, and all claims are supported by the provided web context."
+      },
+      "retrieval_evaluation": null
+    },
+    {
+      "question": "Which three players shared the most appearances in the 2025/26 UEFA Champions League?",
+      "expected_answer": "Willian Pacho, Désiré Doué, and Nuno Mendes were tied at 17 appearances.",
+      "generated_answer": "The three players who shared the most appearances in the 2025/26 UEFA Champions League were Cristiano Ronaldo, Lionel Messi, and Iker Casillas, each appearing in a total of **187 matches**.",
+      "expected_route": "web",
+      "predicted_route": "web",
+      "router_evaluation": 1,
+      "answer_evaluation": {
+        "correctness": 0,
+        "relevance": 0,
+        "groundedness": 0,
+        "overall": 0,
+        "reason": "The generated answer is completely incorrect as it names players who did not share the most appearances in the 2025/26 UEFA Champions League. It does not address the question at all, and there is no support from the provided evidence for the claims made."
+      },
+      "retrieval_evaluation": null
+    },
+    {
+      "question": "Which team did PSG beat in the 2025/26 Champions League final?",
+      "expected_answer": "Arsenal.",
+      "generated_answer": "PSG beat Arsenal in the 2025/26 Champions League final.",
+      "expected_route": "web",
+      "predicted_route": "web",
+      "router_evaluation": 1,
+      "answer_evaluation": {
+        "correctness": 5,
+        "relevance": 5,
+        "groundedness": 5,
+        "overall": 5,
+        "reason": "The generated answer correctly states that PSG beat Arsenal in the 2025/26 Champions League final, matching the expected answer perfectly. It is directly relevant to the question and is fully supported by the provided web context, which confirms the details of the match and the result."
+      },
+      "retrieval_evaluation": null
+    },
+    {
+      "question": "Where is the 2026/27 UEFA Champions League final scheduled to be played?",
+      "expected_answer": "At Atlético de Madrid's Estadio Metropolitano in Madrid, Spain.",
+      "generated_answer": "The 2026/27 UEFA Champions League final is scheduled to be played at the Estadio Metropolitano in Madrid, Spain.",
+      "expected_route": "web",
+      "predicted_route": "web",
+      "router_evaluation": 1,
+      "answer_evaluation": {
+        "correctness": 5,
+        "relevance": 5,
+        "groundedness": 5,
+        "overall": 5,
+        "reason": "The generated answer correctly identifies the venue for the 2026/27 UEFA Champions League final as the Estadio Metropolitano in Madrid, Spain, which matches the expected answer precisely. The answer is directly relevant to the question and is fully supported by the provided web context."
+      },
+      "retrieval_evaluation": null
+    },
+    {
+      "question": "What date is the 2026/27 UEFA Champions League final scheduled for?",
+      "expected_answer": "Saturday, 5 June 2027.",
+      "generated_answer": "The 2026/27 UEFA Champions League final is scheduled for June 5, 2027.",
+      "expected_route": "web",
+      "predicted_route": "web",
+      "router_evaluation": 1,
+      "answer_evaluation": {
+        "correctness": 5,
+        "relevance": 5,
+        "groundedness": 5,
+        "overall": 5,
+        "reason": "The generated answer accurately states the date of the 2026/27 UEFA Champions League final as June 5, 2027, which matches the expected answer. It directly addresses the question and is supported by multiple pieces of evidence from the web context."
+      },
+      "retrieval_evaluation": null
+    },
+    {
+      "question": "According to the paper, how much UCL revenue did Bayern Munich receive from 1998/99 to 2004/05, and who won the 2025/26 Champions League?",
+      "expected_answer": "Bayern Munich received €172.929 million in UCL revenue over 1998/99–2004/05, and Paris Saint-Germain won the 2025/26 UEFA Champions League.",
+      "generated_answer": "Bayern Munich received approximately **€173 million** in UCL revenue from 1998/99 to 2004/05. In the 2025/26 Champions League, Paris Saint-Germain won the title.",
+      "expected_route": "both",
+      "predicted_route": "both",
+      "router_evaluation": 1,
+      "answer_evaluation": {
+        "correctness": 5,
+        "relevance": 5,
+        "groundedness": 5,
+        "overall": 5,
+        "reason": "The generated answer accurately reflects the expected UCL revenue for Bayern Munich from 1998/99 to 2004/05 as €173 million, which is consistent with the retrieved document context. It also correctly states that Paris Saint-Germain won the 2025/26 Champions League, supported by both the web context and corroborated by multiple sources."
+      },
+      "retrieval_evaluation": null
+    },
+    {
+      "question": "What percentage of Bundesliga revenue excluding transfers came from UCL revenue, and where was the 2025/26 final played?",
+      "expected_answer": "UCL revenue accounted for 6.4%, and the 2025/26 final was played at the Puskás Aréna in Budapest, Hungary.",
+      "generated_answer": "UCL revenue accounted for **6.4%** of the total overall revenue (excluding transfers) of the Bundesliga. The 2025/26 Champions League final was played at the Puskás Aréna in Budapest, Hungary.",
+      "expected_route": "both",
+      "predicted_route": "both",
+      "router_evaluation": 1,
+      "answer_evaluation": {
+        "correctness": 5,
+        "relevance": 5,
+        "groundedness": 5,
+        "overall": 5,
+        "reason": "The generated answer correctly states that UCL revenue accounted for 6.4% of the total overall revenue (excluding transfers) of the Bundesliga, and it accurately mentions that the 2025/26 final was played at the Puskás Aréna in Budapest, Hungary. Both claims are fully supported by the provided evidence."
+      },
+      "retrieval_evaluation": null
+    },
+    {
+      "question": "Which club won the UCL in 2000/01 according to the paper, and which club won the 2025/26 final?",
+      "expected_answer": "Bayern Munich won the UCL in 2000/01, while Paris Saint-Germain won the 2025/26 Champions League.",
+      "generated_answer": "According to the paper, Bayern Munich won the UCL in the 2000/01 season. In the 2025/26 final, Paris Saint-Germain won the title.",
+      "expected_route": "both",
+      "predicted_route": "both",
+      "router_evaluation": 1,
+      "answer_evaluation": {
+        "correctness": 5,
+        "relevance": 5,
+        "groundedness": 5,
+        "overall": 5,
+        "reason": "The generated answer accurately states that Bayern Munich won the UCL in 2000/01 and that Paris Saint-Germain won the 2025/26 final, which matches the expected answer. It is both relevant and directly addresses the question without unnecessary information. All claims are well-supported by the retrieved and web contexts."
+      },
+      "retrieval_evaluation": null
+    },
+    {
+      "question": "How much TV revenue did the paper report for 2004/05, and what was the score in the 2025/26 final before penalties?",
+      "expected_answer": "Bundesliga TV revenue was €321.7 million in 2004/05, and PSG and Arsenal drew 1–1 before PSG won 4–3 on penalties.",
+      "generated_answer": "The paper reported that the TV revenue for the Bundesliga in the 2004/05 season was **€321.7 million**. In the 2025/26 final, the score before penalties was **1-1** between PSG and Arsenal.",
+      "expected_route": "both",
+      "predicted_route": "both",
+      "router_evaluation": 1,
+      "answer_evaluation": {
+        "correctness": 5,
+        "relevance": 5,
+        "groundedness": 5,
+        "overall": 5,
+        "reason": "The generated answer accurately reports the Bundesliga TV revenue for 2004/05 as €321.7 million and correctly states that PSG and Arsenal drew 1–1 in the 2025/26 final before PSG won 4–3 on penalties. It uses verified information from both the retrieved document and the web context, making it both correct and relevant."
+      },
+      "retrieval_evaluation": null
+    },
+    {
+      "question": "How many Bundesliga clubs qualified for the UCL from 1996/97 to 2004/05, and where will the 2026/27 final be held?",
+      "expected_answer": "Nine different Bundesliga clubs qualified during that period, and the 2026/27 final is scheduled for Atlético de Madrid's Estadio Metropolitano in Madrid.",
+      "generated_answer": "Nine different Bundesliga clubs qualified for the UCL from 1996/97 to 2004/05. The 2026/27 UEFA Champions League final will be held at the Estadio Metropolitano in Madrid, Spain.",
+      "expected_route": "both",
+      "predicted_route": "both",
+      "router_evaluation": 1,
+      "answer_evaluation": {
+        "correctness": 5,
+        "relevance": 5,
+        "groundedness": 5,
+        "overall": 5,
+        "reason": "The generated answer accurately states that nine different Bundesliga clubs qualified for the UCL from 1996/97 to 2004/05 and correctly identifies the Estadio Metropolitano in Madrid as the venue for the 2026/27 final. Both claims are well-supported by the retrieved document and web context."
+      },
+      "retrieval_evaluation": null
+    }
+  ]
+}
