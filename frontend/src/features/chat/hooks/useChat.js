@@ -18,6 +18,7 @@ export function useChat() {
     streamingMessage,
     streamingStatus,
     isStreaming,
+    error,
     clearMessages,
     loadMessages,
     sendMessage,
@@ -66,6 +67,8 @@ export function useChat() {
     streamingStatus,
 
     isStreaming,
+
+    error,
 
     activeConversationId:
       conversationId,

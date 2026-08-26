@@ -39,6 +39,25 @@ const readStatusPayload = (data) => {
     }
 };
 
+const readErrorPayload = (data) => {
+    try {
+        const payload = JSON.parse(data);
+
+        if (
+            !payload ||
+            typeof payload !== "object" ||
+            Array.isArray(payload) ||
+            typeof payload.message !== "string"
+        ) {
+            return null;
+        }
+
+        return payload;
+    } catch {
+        return null;
+    }
+};
+
 const buildStreamUrl = (path) => {
     return `/api/v1${path}`;
 };
@@ -112,6 +131,15 @@ export const streamChat = async (
                         onStatus?.(status);
                     }
 
+                    return;
+                }
+
+                if (event.event === "error") {
+                    const error = readErrorPayload(event.data);
+
+                    onError(
+                        error ?? new Error("Unable to process your request."),
+                    );
                     return;
                 }
 

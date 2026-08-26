@@ -19,6 +19,7 @@ export default function MessageList({
   streamingMessage = "",
   streamingStatus = null,
   isStreaming = false,
+  error = null,
   className,
 }) {
   const scrollContainerRef = useRef(null);
@@ -95,11 +96,12 @@ export default function MessageList({
     messages,
     streamingMessage,
     isStreaming,
+    error,
     scrollToBottom,
     updateScrollButton,
   ]);
 
-  if (messages.length === 0 && !isStreaming) {
+  if (messages.length === 0 && !isStreaming && !error) {
     return (
       <div
         className={cn(
@@ -139,6 +141,15 @@ export default function MessageList({
               sender="assistant"
               content={streamingMessage}
             />
+          )}
+
+          {error && (
+            <p
+              className="border-2 border-[var(--color-danger)] px-3 py-2 text-xs font-black uppercase text-[var(--color-danger)]"
+              role="alert"
+            >
+              {error}
+            </p>
           )}
         </div>
       </div>

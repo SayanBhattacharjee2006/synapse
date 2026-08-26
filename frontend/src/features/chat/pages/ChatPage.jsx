@@ -35,6 +35,7 @@ export default function ChatPage() {
         streamingMessage,
         streamingStatus,
         isStreaming,
+        error,
         handleSendMessage,
     } = useChat();
 
@@ -193,6 +194,7 @@ export default function ChatPage() {
                         streamingMessage={streamingMessage}
                         streamingStatus={streamingStatus}
                         isStreaming={isStreaming}
+                        error={error}
                     />
 
                     <UploadedFilesDrawer

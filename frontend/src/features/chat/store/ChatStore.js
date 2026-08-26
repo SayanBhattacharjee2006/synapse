@@ -85,6 +85,10 @@ export const useChatStore = create((set, get) => ({
                 },
 
                 async () => {
+                    if (!get().isStreaming) {
+                        return;
+                    }
+
                     set({ streamingStatus: null });
 
                     const aiMessage = await createMessage(conversationId, {
@@ -111,7 +115,9 @@ export const useChatStore = create((set, get) => ({
                 },
                 (error) => {
                     set({
+                        isLoading: false,
                         isStreaming: false,
+                        streamingMessage: "",
                         streamingStatus: null,
                         error: error.message,
                     });
