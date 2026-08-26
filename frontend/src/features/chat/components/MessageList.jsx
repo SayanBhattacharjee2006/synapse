@@ -17,6 +17,7 @@ export default function MessageList({
   conversationId,
   messages = [],
   streamingMessage = "",
+  streamingStatus = null,
   isStreaming = false,
   className,
 }) {
@@ -130,7 +131,7 @@ export default function MessageList({
           ))}
 
           {isStreaming && !streamingMessage && (
-            <StreamingLoader />
+            <StreamingLoader statusMessage={streamingStatus?.message} />
           )}
 
           {isStreaming && streamingMessage && (

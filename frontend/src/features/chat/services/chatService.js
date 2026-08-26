@@ -16,6 +16,29 @@ const readTitlePayload = (data) => {
     }
 };
 
+const readStatusPayload = (data) => {
+    try {
+        const payload = JSON.parse(data);
+
+        if (
+            !payload ||
+            typeof payload !== "object" ||
+            Array.isArray(payload) ||
+            typeof payload.status !== "string" ||
+            typeof payload.message !== "string"
+        ) {
+            return null;
+        }
+
+        return {
+            status: payload.status,
+            message: payload.message,
+        };
+    } catch {
+        return null;
+    }
+};
+
 const buildStreamUrl = (path) => {
     return `/api/v1${path}`;
 };
@@ -59,6 +82,7 @@ export const streamChat = async (
     onToken,
     onDone,
     onTitle,
+    onStatus,
     onError,
 ) => {
     await fetchEventSource(
@@ -78,6 +102,16 @@ export const streamChat = async (
 
                 if (event.event === "title") {
                     onTitle?.(readTitlePayload(event.data));
+                    return;
+                }
+
+                if (event.event === "status") {
+                    const status = readStatusPayload(event.data);
+
+                    if (status) {
+                        onStatus?.(status);
+                    }
+
                     return;
                 }
 

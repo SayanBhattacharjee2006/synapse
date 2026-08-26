@@ -12,6 +12,8 @@ export const useChatStore = create((set, get) => ({
 
     streamingMessage: "",
 
+    streamingStatus: null,
+
     isStreaming: false,
 
     isLoading: false,
@@ -22,6 +24,7 @@ export const useChatStore = create((set, get) => ({
         set({
             messages: [],
             streamingMessage: "",
+            streamingStatus: null,
             isStreaming: false,
             isLoading: false,
             error: null,
@@ -65,6 +68,7 @@ export const useChatStore = create((set, get) => ({
 
                 isStreaming: true,
                 streamingMessage: "",
+                streamingStatus: null,
 
                 isLoading: false,
             }));
@@ -81,6 +85,8 @@ export const useChatStore = create((set, get) => ({
                 },
 
                 async () => {
+                    set({ streamingStatus: null });
+
                     const aiMessage = await createMessage(conversationId, {
                         content: get().streamingMessage,
 
@@ -92,6 +98,7 @@ export const useChatStore = create((set, get) => ({
 
                         isStreaming: false,
                         streamingMessage: "",
+                        streamingStatus: null,
                     }));
                 },
                 (title) => {
@@ -99,9 +106,13 @@ export const useChatStore = create((set, get) => ({
                         .getState()
                         .setConversationTitle(conversationId, title);
                 },
+                (status) => {
+                    set({ streamingStatus: status });
+                },
                 (error) => {
                     set({
                         isStreaming: false,
+                        streamingStatus: null,
                         error: error.message,
                     });
                 },
@@ -109,6 +120,7 @@ export const useChatStore = create((set, get) => ({
         } catch (error) {
             set({
                 isLoading: false,
+                streamingStatus: null,
                 error: error.message,
             });
         }

@@ -1,6 +1,6 @@
 import { cn } from "@/lib/utils";
 
-export default function StreamingLoader() {
+export default function StreamingLoader({ statusMessage }) {
   return (
     <div className="flex w-full justify-start">
       <div
@@ -22,6 +22,11 @@ export default function StreamingLoader() {
             className="inline-block h-2.5 w-2.5 rounded-full bg-black animate-[brutal-bounce_1.4s_ease-in-out_infinite]"
             style={{ animationDelay: "0.4s" }}
           />
+          {statusMessage && (
+            <span className="ml-2 text-sm font-bold text-[var(--color-muted)]">
+              {statusMessage}
+            </span>
+          )}
         </div>
       </div>
     </div>

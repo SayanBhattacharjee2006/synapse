@@ -16,6 +16,7 @@ export function useChat() {
   const {
     messages,
     streamingMessage,
+    streamingStatus,
     isStreaming,
     clearMessages,
     loadMessages,
@@ -61,6 +62,8 @@ export function useChat() {
     messages,
 
     streamingMessage,
+
+    streamingStatus,
 
     isStreaming,
 

@@ -12,6 +12,26 @@ from app.ai.rag.services.summary_memory_sevice import store_summary
 from app.core.logging import logger
 
 
+STATUS_BY_NODE = {
+    "evaluator": {
+        "status": "routing",
+        "message": "Understanding your question...",
+    },
+    "retreiver": {
+        "status": "searching_documents",
+        "message": "Searching your uploaded documents...",
+    },
+    "web": {
+        "status": "searching_web",
+        "message": "Searching the web...",
+    },
+    "llm": {
+        "status": "generating",
+        "message": "Generating answer...",
+    },
+}
+
+
 async def stream_chat(
     request: Request,
     conversation_id: uuid.UUID,
@@ -72,6 +92,16 @@ async def stream_chat(
             config=config,
             version="v2",
         ):
+            if event["event"] == "on_chain_start":
+                node = event.get("metadata", {}).get("langgraph_node")
+                status = STATUS_BY_NODE.get(node)
+
+                if status:
+                    yield (
+                        f"event: status\n"
+                        f"data: {json.dumps(status)}\n\n"
+                    )
+
             if event["event"] == "on_chain_end" and event.get("name") == "summarisation":
                 summary = event["data"]["output"].get("summary", "")
 

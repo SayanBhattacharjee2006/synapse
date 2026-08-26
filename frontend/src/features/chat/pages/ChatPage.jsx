@@ -33,6 +33,7 @@ export default function ChatPage() {
         activeConversationId,
         messages,
         streamingMessage,
+        streamingStatus,
         isStreaming,
         handleSendMessage,
     } = useChat();
@@ -190,6 +191,7 @@ export default function ChatPage() {
                         conversationId={activeConversationId}
                         messages={messages}
                         streamingMessage={streamingMessage}
+                        streamingStatus={streamingStatus}
                         isStreaming={isStreaming}
                     />
 
