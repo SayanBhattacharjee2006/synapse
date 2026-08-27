@@ -61,7 +61,7 @@ async def retreive_context(query: str, conversation_id: str, k: int = 5):
 
     if not document_summaries.points:
         logger.bind(conversation_id=conversation_id).warning("rag.retrieval.not_found")
-        return "", False
+        return "", False, []
 
     multi_vector = await asyncio.to_thread(embed_late_interaction_query, query)
 
@@ -108,9 +108,17 @@ async def retreive_context(query: str, conversation_id: str, k: int = 5):
 
     docs = results.points
 
+    retrieved_document_names = list(
+        dict.fromkeys(
+            doc.payload["filename"] for doc in docs if doc.payload.get("filename")
+        )
+    )
+
     if not docs:
-        logger.bind(conversation_id=conversation_id).warning("rag.document_chunks.not_found")
-        return "", False
+        logger.bind(conversation_id=conversation_id).warning(
+            "rag.document_chunks.not_found"
+        )
+        return "", False, []
 
     best_score = docs[0].score
     logger.bind(
@@ -124,8 +132,8 @@ async def retreive_context(query: str, conversation_id: str, k: int = 5):
             conversation_id=conversation_id,
             best_score=best_score,
         ).warning("rag.retrieval.below_threshold")
-        return "", False
+        return "", False, []
 
     context = create_context(docs)
 
-    return context, True
+    return context, True, retrieved_document_names

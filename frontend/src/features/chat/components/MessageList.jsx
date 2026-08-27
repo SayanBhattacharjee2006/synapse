@@ -18,6 +18,7 @@ export default function MessageList({
   messages = [],
   streamingMessage = "",
   streamingStatus = null,
+  streamingSources = null,
   isStreaming = false,
   error = null,
   className,
@@ -95,6 +96,7 @@ export default function MessageList({
     conversationId,
     messages,
     streamingMessage,
+    streamingSources,
     isStreaming,
     error,
     scrollToBottom,
@@ -129,6 +131,7 @@ export default function MessageList({
               key={message.id}
               sender={message.sender}
               content={message.content}
+              sources={message.sources}
             />
           ))}
 
@@ -140,6 +143,7 @@ export default function MessageList({
             <MessageBubble
               sender="assistant"
               content={streamingMessage}
+              sources={streamingSources}
             />
           )}
 

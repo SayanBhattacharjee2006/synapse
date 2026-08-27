@@ -17,6 +17,7 @@ export function useChat() {
     messages,
     streamingMessage,
     streamingStatus,
+    streamingSources,
     isStreaming,
     error,
     clearMessages,
@@ -65,6 +66,8 @@ export function useChat() {
     streamingMessage,
 
     streamingStatus,
+
+    streamingSources,
 
     isStreaming,
 

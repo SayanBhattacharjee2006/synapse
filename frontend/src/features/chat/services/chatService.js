@@ -1,6 +1,10 @@
 import { fetchEventSource } from "@microsoft/fetch-event-source";
 
 import api from "@/library/api.js";
+import {
+    readRetrievalPayload,
+    readWebPayload,
+} from "@/features/chat/utils/sourceUtils.js";
 
 const readTitlePayload = (data) => {
     try {
@@ -103,6 +107,8 @@ export const streamChat = async (
     onTitle,
     onStatus,
     onError,
+    onRetrieval,
+    onWeb,
 ) => {
     await fetchEventSource(
         buildStreamUrl(`/conversations/${conversationId}/chat`),
@@ -129,6 +135,26 @@ export const streamChat = async (
 
                     if (status) {
                         onStatus?.(status);
+                    }
+
+                    return;
+                }
+
+                if (event.event === "retrieval_found") {
+                    const docs = readRetrievalPayload(event.data);
+
+                    if (docs && docs.length > 0) {
+                        onRetrieval?.(docs);
+                    }
+
+                    return;
+                }
+
+                if (event.event === "web_found") {
+                    const web = readWebPayload(event.data);
+
+                    if (web && web.length > 0) {
+                        onWeb?.(web);
                     }
 
                     return;

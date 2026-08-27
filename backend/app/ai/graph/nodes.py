@@ -118,7 +118,7 @@ async def retreive_context_node(state: GraphState) -> dict:
         conversation_id=str(state.get("conversation_id", "")),
     ).info("rag.retrieval.started")
 
-    context, success = await retreive_context(
+    context, success, retrieved_sources = await retreive_context(
         query=query, conversation_id=str(state.get("conversation_id", ""))
     )
 
@@ -126,7 +126,12 @@ async def retreive_context_node(state: GraphState) -> dict:
         conversation_id=str(state.get("conversation_id", "")),
         retrieval_found=success,
     ).info("rag.retrieval.completed")
-    return {"retrieved_context": context, "retrieval_found": success}
+    return {
+        "retrieved_context": context,
+        "retrieval_found": success,
+        "retrieved_document_names": retrieved_sources,
+        "retieved_document_names": retrieved_sources,
+    }
 
 
 async def evaluator_node(state: GraphState) -> dict:
@@ -200,17 +205,18 @@ async def web_retreival_node(state: GraphState) -> dict:
             conversation_id=str(state.get("conversation_id", "")),
             result_count=len(response.get("results", [])),
         ).info("web.retrieval.completed")
+        web_sources = [result["url"] for result in response.get("results", [])]
         if state.get("router", RouterType.NONE) == RouterType.BOTH:
             return {
                 "web_context": context,
-                "web_found": bool(response["results"]),
-                "web_sources": [result["url"] for result in response["results"]],
+                "web_found": bool(response.get("results")),
+                "web_sources": web_sources,
             }
         else:
             return {
                 "web_context": context,
-                "web_found": bool(response["results"]),
-                "web_sources": [],
+                "web_found": bool(response.get("results")),
+                "web_sources": web_sources,
                 "retrieved_context": context,
                 "retrieval_found": False,
             }
@@ -224,4 +230,5 @@ async def web_retreival_node(state: GraphState) -> dict:
             conversation_id=str(state.get("conversation_id", "")),
         ).exception("web.retrieval.failed")
     return {"web_context": "", "web_found": False, "web_sources": []}
+
 

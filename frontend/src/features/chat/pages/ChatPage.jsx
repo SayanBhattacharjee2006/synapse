@@ -34,6 +34,7 @@ export default function ChatPage() {
         messages,
         streamingMessage,
         streamingStatus,
+        streamingSources,
         isStreaming,
         error,
         handleSendMessage,
@@ -193,6 +194,7 @@ export default function ChatPage() {
                         messages={messages}
                         streamingMessage={streamingMessage}
                         streamingStatus={streamingStatus}
+                        streamingSources={streamingSources}
                         isStreaming={isStreaming}
                         error={error}
                     />

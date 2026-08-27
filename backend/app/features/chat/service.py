@@ -62,6 +62,10 @@ async def stream_chat(
 
         is_first_message = len(messages) == 1
         summary = None
+        retrieved_document_names = []
+        retrieval_found = False
+        web_sources = []
+        web_found = False
 
         stmt = select(Conversation).where(
             Conversation.id == conversation_id,
@@ -79,10 +83,10 @@ async def stream_chat(
         ).info("chat.response.stream.started")
 
         metadata = {
-        "conversation_id": str(conversation_id),
-        "user_id": str(user_id),
-        "has_uploaded_documents": has_uploaded_documents,
-    }
+            "conversation_id": str(conversation_id),
+            "user_id": str(user_id),
+            "has_uploaded_documents": has_uploaded_documents,
+        }
         with ls.tracing_context(
             metadata=metadata,
             tags=['synapse', 'chat'],
@@ -90,7 +94,7 @@ async def stream_chat(
             async for event in graph.astream_events(
                 {
                     "messages": [HumanMessage(content=message.content)],
-                    "conversation_id":str(conversation_id),
+                    "conversation_id": str(conversation_id),
                     "has_uploaded_documents": has_uploaded_documents,
                 },
                 config=config,
@@ -106,8 +110,29 @@ async def stream_chat(
                             f"data: {json.dumps(status)}\n\n"
                         )
 
-                if event["event"] == "on_chain_end" and event.get("name") == "summarisation":
-                    summary = event["data"]["output"].get("summary", "")
+                if event["event"] == "on_chain_end":
+                    node = event.get("metadata", {}).get("langgraph_node") or event.get("name")
+                    output = event.get("data", {}).get("output")
+
+                    if isinstance(output, dict):
+                        if node == "summarisation" or event.get("name") == "summarisation":
+                            summary = output.get("summary", "")
+
+                        if node == "retreiver" or event.get("name") == "retreiver":
+                            retrieval_found = output.get("retrieval_found", False)
+                            docs = (
+                                output.get("retrieved_document_names")
+                                or output.get("retieved_document_names")
+                                or []
+                            )
+                            if isinstance(docs, list):
+                                retrieved_document_names = docs
+
+                        if node == "web" or event.get("name") == "web":
+                            web_found = output.get("web_found", False)
+                            urls = output.get("web_sources", [])
+                            if isinstance(urls, list):
+                                web_sources = urls
 
                 if (
                     event["event"] == "on_chat_model_stream"
@@ -153,12 +178,19 @@ async def stream_chat(
         if is_first_message:
             yield f"event: title\ndata: {json.dumps({'title': title})}\n\n"
 
+        if retrieval_found:
+            yield f"event: retrieval_found\ndata: {json.dumps({'retrieved_doc_names': retrieved_document_names})}\n\n"
+
+        if web_found:
+            yield f"event: web_found\ndata: {json.dumps({'web_sources': web_sources})}\n\n"
+
         logger.bind(
             conversation_id=str(conversation_id),
             user_id=str(user_id),
             summary_updated=bool(summary),
             title_generated=is_first_message,
         ).info("chat.response.stream.completed")
+
 
     except Exception:
         logger.bind(

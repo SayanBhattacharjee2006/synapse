@@ -9,6 +9,7 @@ class GraphState(MessagesState):
 
     retrieved_context: str = ""
     retrieval_found: bool = False
+    retrieved_document_names: List[str] = []
         
     web_context: str = ""
     web_sources: List[str] = []

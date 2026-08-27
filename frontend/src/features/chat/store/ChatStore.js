@@ -14,6 +14,8 @@ export const useChatStore = create((set, get) => ({
 
     streamingStatus: null,
 
+    streamingSources: null,
+
     isStreaming: false,
 
     isLoading: false,
@@ -25,6 +27,7 @@ export const useChatStore = create((set, get) => ({
             messages: [],
             streamingMessage: "",
             streamingStatus: null,
+            streamingSources: null,
             isStreaming: false,
             isLoading: false,
             error: null,
@@ -36,6 +39,7 @@ export const useChatStore = create((set, get) => ({
             set({
                 isLoading: true,
                 error: null,
+                streamingSources: null,
             });
 
             const response = await getMessages(conversationId);
@@ -69,6 +73,7 @@ export const useChatStore = create((set, get) => ({
                 isStreaming: true,
                 streamingMessage: "",
                 streamingStatus: null,
+                streamingSources: null,
 
                 isLoading: false,
             }));
@@ -91,18 +96,32 @@ export const useChatStore = create((set, get) => ({
 
                     set({ streamingStatus: null });
 
+                    const currentSources = get().streamingSources;
+                    const hasValidSources =
+                        currentSources &&
+                        ((Array.isArray(currentSources.documents) &&
+                            currentSources.documents.length > 0) ||
+                            (Array.isArray(currentSources.web) &&
+                                currentSources.web.length > 0));
+
                     const aiMessage = await createMessage(conversationId, {
                         content: get().streamingMessage,
 
                         sender: "assistant",
-                    });                 
+                    });
+
+                    const messageWithSources = {
+                        ...aiMessage.data,
+                        ...(hasValidSources ? { sources: currentSources } : {}),
+                    };
 
                     set((state) => ({
-                        messages: [...state.messages, aiMessage.data],
+                        messages: [...state.messages, messageWithSources],
 
                         isStreaming: false,
                         streamingMessage: "",
                         streamingStatus: null,
+                        streamingSources: null,
                     }));
                 },
                 (title) => {
@@ -119,14 +138,59 @@ export const useChatStore = create((set, get) => ({
                         isStreaming: false,
                         streamingMessage: "",
                         streamingStatus: null,
+                        streamingSources: null,
                         error: error.message,
+                    });
+                },
+                (retrievedDocs) => {
+                    if (!retrievedDocs || retrievedDocs.length === 0) {
+                        return;
+                    }
+
+                    set((state) => {
+                        const currentDocs =
+                            state.streamingSources?.documents || [];
+                        const currentWeb = state.streamingSources?.web || [];
+                        const mergedDocs = Array.from(
+                            new Set([...currentDocs, ...retrievedDocs]),
+                        );
+
+                        return {
+                            streamingSources: {
+                                documents: mergedDocs,
+                                web: currentWeb,
+                            },
+                        };
+                    });
+                },
+                (webSources) => {
+                    if (!webSources || webSources.length === 0) {
+                        return;
+                    }
+
+                    set((state) => {
+                        const currentDocs =
+                            state.streamingSources?.documents || [];
+                        const currentWeb = state.streamingSources?.web || [];
+                        const mergedWeb = Array.from(
+                            new Set([...currentWeb, ...webSources]),
+                        );
+
+                        return {
+                            streamingSources: {
+                                documents: currentDocs,
+                                web: mergedWeb,
+                            },
+                        };
                     });
                 },
             );
         } catch (error) {
             set({
                 isLoading: false,
+                isStreaming: false,
                 streamingStatus: null,
+                streamingSources: null,
                 error: error.message,
             });
         }

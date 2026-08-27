@@ -1,8 +1,10 @@
+import SourcesSection from "@/features/chat/components/SourcesSection";
 import { cn } from "@/lib/utils";
 
 export default function MessageBubble({
   sender = "assistant",
   content,
+  sources,
 }) {
   const isUser = sender === "user";
 
@@ -25,7 +27,12 @@ export default function MessageBubble({
         <p className="whitespace-pre-wrap break-words text-base font-extrabold">
           {content}
         </p>
+
+        {!isUser && sources && (
+          <SourcesSection sources={sources} />
+        )}
       </div>
     </div>
   );
 }
+
