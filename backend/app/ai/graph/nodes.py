@@ -120,7 +120,9 @@ async def retreive_context_node(state: GraphState) -> dict:
     ).info("rag.retrieval.started")
 
     context, success, retrieved_sources = await retreive_context(
-        query=query, conversation_id=str(state.get("conversation_id", ""))
+        query=query,
+        document_summaries=state.get("document_summaries", []),
+        conversation_id=str(state.get("conversation_id", "")),
     )
 
     logger.bind(

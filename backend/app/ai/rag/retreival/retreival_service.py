@@ -1,4 +1,5 @@
 import asyncio
+from app.ai.schema import DocumentSummarySchema
 from app.ai.rag.client import client
 from app.ai.rag.embeddings import (
     get_dense_embeddings,
@@ -11,10 +12,14 @@ from app.features.documents.dependency import create_context
 from app.core.logging import logger
 
 
-async def retreive_context(query: str, conversation_id: str, k: int = 5):
-    # Embed the query 3 ways — dense (async HTTP), sparse + multi (CPU, off the event loop)
+async def retrieve_document_summaries(
+    query: str, conversation_id: str, k: int = 5
+) -> list[DocumentSummarySchema]:
+    
+    logger.bind(conversation_id=conversation_id).info(
+        "rag.document_summary.retrieval.started"
+    )
 
-    # generate embeddings for the query
     dense_vector = await get_dense_embeddings().aembed_query(query)
     sparse_vector = await asyncio.to_thread(embed_sparse_query, query)
 
@@ -27,9 +32,7 @@ async def retreive_context(query: str, conversation_id: str, k: int = 5):
         ]
     )
 
-    # Filter the Documents by finding DocumentSummaries with hybrid Search(sparse and dense except multi)
-
-    document_summaries = await client.query_points(
+    results = await client.query_points(
         collection_name=settings.QDRANT_DOCUMENT_SUMMARY_COLLECTION,
         prefetch=[
             models.Prefetch(
@@ -56,28 +59,60 @@ async def retreive_context(query: str, conversation_id: str, k: int = 5):
 
     logger.bind(
         conversation_id=conversation_id,
-        document_count=len(document_summaries.points),
+        document_count=len(results.points),
     ).info("rag.document_summary.retrieval.completed")
 
-    if not document_summaries.points:
-        logger.bind(conversation_id=conversation_id).warning("rag.retrieval.not_found")
-        return "", False, []
+    if not results.points:
+        logger.bind(conversation_id=conversation_id).warning(
+            "rag.document_summary.retrieval.not_found"
+        )
+        return []
 
+    return [
+        DocumentSummarySchema(**document_summary.payload)
+        for document_summary in results.points
+    ]
+
+
+async def retreive_context(
+    query: str,
+    document_summaries: list[DocumentSummarySchema],
+    conversation_id: str,
+    k: int = 5,
+):
+    # Embed the query 3 ways — dense (async HTTP), sparse + multi (CPU, off the event loop)
+
+    logger.bind(conversation_id=conversation_id).info(
+        "rag.document_chunks.retrieval.started"
+    )
+
+    dense_vector = await get_dense_embeddings().aembed_query(query)
+    sparse_vector = await asyncio.to_thread(embed_sparse_query, query)
     multi_vector = await asyncio.to_thread(embed_late_interaction_query, query)
 
-    doc_chunk_filter = models.Filter(
-        must=[
-            models.FieldCondition(
-                key="document_id",
-                match=models.MatchAny(
-                    any=[
-                        str(doc.payload["document_id"])
-                        for doc in document_summaries.points
-                    ]
+    if document_summaries:
+        doc_chunk_filter = models.Filter(
+            must=[
+                models.FieldCondition(
+                    key="document_id",
+                    match=models.MatchAny(
+                        any=[
+                            str(document_summary.document_id)
+                            for document_summary in document_summaries
+                        ]
+                    ),
                 ),
-            ),
-        ]
-    )
+            ]
+        )
+    else:
+        doc_chunk_filter = models.Filter(
+            must=[
+                models.FieldCondition(
+                    key="conversation_id",
+                    match=models.MatchValue(value=conversation_id),
+                ),
+            ]
+        )
 
     # Find the best matched Chunks from the filtered scope
     results = await client.query_points(

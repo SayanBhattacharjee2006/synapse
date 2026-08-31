@@ -1,5 +1,5 @@
 from langchain_openai import OpenAIEmbeddings
-from fastembed import SparseTextEmbedding, LateInteractionTextEmbedding
+from fastembed import SparseTextEmbedding, LateInteractionTextEmbedding 
 from functools import lru_cache
 import asyncio
 from app.core.logging import logger
@@ -49,7 +49,7 @@ async def embed_chunks_in_batches(texts: list[str], batch_size: int = 32):
     for i in range(0, len(texts), batch_size):
         batch = texts[i:i + batch_size]
         logger.bind(
-            batch_number=i // batch_size + 1,
+            batch_number=i // batch_size + 1, 
             chunk_count=len(batch),
         ).info("document.embedding.batch.started")
 
