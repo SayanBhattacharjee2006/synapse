@@ -56,7 +56,7 @@ async def evaluation_runner(
                     retrieved_context=res.retrieved_context,
                     reference_evidence=validated_outputs[index].get("reference_evidence"),
                 )
-                if validated_outputs[index]["expected_route"] == "rag"
+                if validated_outputs[index]["expected_route"] in ["rag", "both"]
                 else asyncio.sleep(0, result=None),
             )
 

@@ -23,28 +23,19 @@ from app.core.logging import logger
 
 async def llm_node(state: GraphState) -> dict:
     summary = state.get("summary", "")
-    retrieved_context = state.get("retrieved_context", "")
-    retrieval_found = state.get("retrieval_found", False)
-    web_context = state.get("web_context", "")
-    web_found = state.get("web_found", False)
+    full_context = state.get("full_context", "")
     router = state.get("router", RouterType.NONE)
 
     logger.bind(
         conversation_id=str(state.get("conversation_id", "")),
         router=router.value,
-        retrieval_found=retrieval_found,
-        web_found=web_found,
-        retrieved_context_preview=retrieved_context[:500],
-        web_context_preview=web_context[:500],
+        has_full_context=bool(full_context),
+        full_context_length=len(full_context),
     ).info("chat.llm.started")
-
 
     system_prompt = get_system_prompt(
         summary=summary,
-        retrieved_context=retrieved_context,
-        retrieval_found=retrieval_found,
-        web_context=web_context,
-        web_found=web_found,
+        full_context=full_context,
         router=router,
     )
 
@@ -274,26 +265,44 @@ async def evaluator_node(state: GraphState) -> dict:
 
 
 def route_after_evaluation(state: GraphState):
-    decision = state.get("router", "none")
+    decision = state.get("router", RouterType.NONE)
 
     if decision == RouterType.RAG:
-        return ["retreiver"]
+        return ["doc_summary_retrieval"]
     elif decision == RouterType.WEB:
         return ["web"]
     elif decision == RouterType.BOTH:
-        return ["retreiver", "web"]
+        return ["doc_summary_retrieval"]
     elif decision == RouterType.NONE:
-        return ["llm"]
+        return ["full_context_builder"]
+
+
+def route_after_document_summary(state: GraphState):
+    decision = state.get("router", RouterType.NONE)
+
+    if decision == RouterType.RAG:
+        return ["retreiver"]
+    elif decision == RouterType.BOTH:
+        return ["retreiver", "doc_aware_web_optimizer"]
 
 
 async def web_retreival_node(state: GraphState) -> dict:
-    query = state.get(
-        "optimized_web_query",
-        state["messages"][-1].content
-    )
+    document_aware_web_query = state.get("document_aware_web_query", "")
+    optimized_web_query = state.get("optimized_web_query", "")
+    query = document_aware_web_query or optimized_web_query
+    if not query:
+        query = next(
+            (
+                message.content
+                for message in reversed(state["messages"])
+                if isinstance(message, HumanMessage)
+            ),
+            state["messages"][-1].content,
+        )
 
     logger.bind(
         conversation_id=str(state.get("conversation_id", "")),
+        query=query,
     ).info("web.retrieval.started")
 
     try:
@@ -331,7 +340,7 @@ async def web_retreival_node(state: GraphState) -> dict:
 
         return {
             "web_context": context,
-            "web_found":web_found,
+            "web_found": web_found,
             "web_sources": web_sources,
         }
 
@@ -351,3 +360,49 @@ async def web_retreival_node(state: GraphState) -> dict:
         "web_found": False,
         "web_sources": [],
     }
+
+
+async def full_context_builder_node(state: GraphState) -> dict:
+    router = state.get("router", RouterType.NONE)
+    retrieved_context = state.get("retrieved_context", "")
+    web_context = state.get("web_context", "")
+    conversation_id = str(state.get("conversation_id", ""))
+
+    logger.bind(
+        conversation_id=conversation_id,
+        router=router.value,
+        has_retrieved_context=bool(retrieved_context),
+        has_web_context=bool(web_context),
+    ).info("context.builder.started")
+
+    if router == RouterType.NONE:
+        full_context = ""
+
+    elif router == RouterType.RAG:
+        full_context = retrieved_context
+
+    elif router == RouterType.WEB:
+        full_context = web_context
+
+    elif router == RouterType.BOTH:
+        parts = []
+        if retrieved_context:
+            parts.append(
+                f"DOCUMENT KNOWLEDGE BASE:\n{retrieved_context}"
+            )
+        if web_context:
+            parts.append(
+                f"WEB KNOWLEDGE BASE:\n{web_context}"
+            )
+        full_context = "\n\n".join(parts)
+
+    else:
+        full_context = ""
+
+    logger.bind(
+        conversation_id=conversation_id,
+        router=router.value,
+        full_context_length=len(full_context),
+    ).info("context.builder.completed")
+
+    return {"full_context": full_context}

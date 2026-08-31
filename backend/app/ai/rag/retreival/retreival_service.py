@@ -82,9 +82,12 @@ async def retreive_context(
 ):
     # Embed the query 3 ways — dense (async HTTP), sparse + multi (CPU, off the event loop)
 
-    logger.bind(conversation_id=conversation_id).info(
-        "rag.document_chunks.retrieval.started"
-    )
+    retrieval_scope = "summary_scoped" if document_summaries else "conversation_scoped"
+
+    logger.bind(
+        conversation_id=conversation_id,
+        retrieval_scope=retrieval_scope,
+    ).info("rag.document_chunks.retrieval.started")
 
     dense_vector = await get_dense_embeddings().aembed_query(query)
     sparse_vector = await asyncio.to_thread(embed_sparse_query, query)
@@ -150,14 +153,16 @@ async def retreive_context(
     )
 
     if not docs:
-        logger.bind(conversation_id=conversation_id).warning(
-            "rag.document_chunks.not_found"
-        )
+        logger.bind(
+            conversation_id=conversation_id,
+            retrieval_scope=retrieval_scope,
+        ).warning("rag.document_chunks.not_found")
         return "", False, []
 
     best_score = docs[0].score
     logger.bind(
         conversation_id=conversation_id,
+        retrieval_scope=retrieval_scope,
         result_count=len(docs),
         best_score=best_score,
     ).info("rag.document_chunks.retrieval.completed")

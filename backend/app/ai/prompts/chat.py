@@ -4,10 +4,7 @@ from app.ai.schema import DocumentSummarySchema, RouterType
 
 def get_system_prompt(
     summary: str | None,
-    retrieved_context: str | None,
-    retrieval_found: bool = False,
-    web_context: str | None = None,
-    web_found: bool = False,
+    full_context: str = "",
     router: str | None = None,
 ) -> str:
 
@@ -131,11 +128,8 @@ def get_system_prompt(
         Assistant:
         The uploaded report states revenue was $10M, while the web search results indicate an industry average of $12M.
 
-        DOCUMENT KNOWLEDGE BASE:
-        {retrieved_context}
-
-        WEB KNOWLEDGE BASE:
-        {web_context}
+        KNOWLEDGE CONTEXT:
+        {full_context}
         
     """
 
