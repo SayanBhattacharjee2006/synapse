@@ -1,5 +1,9 @@
-from app.ai.rag.retreival.retreival_service import retreive_context
+from app.ai.rag.retreival.retreival_service import (
+    retrieve_document_summaries,
+    retreive_context,
+)
 from app.ai.prompts.chat import (
+    get_document_aware_web_query_optimizer_prompt,
     get_summariser_prompt,
     get_system_prompt,
     get_evaluator_prompt,
@@ -12,7 +16,7 @@ from langchain_core.messages import (
 )
 from langchain_core.messages.utils import count_tokens_approximately
 from app.ai.llm import llm, router_llm
-from app.ai.schema import RouterType
+from app.ai.schema import DocumentAwareWebQuerySchema, RouterType
 from app.integretions.taviily.tavily import search_tavily, create_search_response
 from app.core.logging import logger
 
@@ -135,6 +139,102 @@ async def retreive_context_node(state: GraphState) -> dict:
         "retrieved_document_names": retrieved_sources,
         "retieved_document_names": retrieved_sources,
     }
+
+
+async def document_summary_retrieval_node(state: GraphState) -> dict:
+    query = state.get("optimized_rag_query", "")
+    if not query:
+        query = next(
+            (
+                message.content
+                for message in reversed(state["messages"])
+                if isinstance(message, HumanMessage)
+            ),
+            state["messages"][-1].content,
+        )
+
+    conversation_id = str(state.get("conversation_id", ""))
+    logger.bind(conversation_id=conversation_id).info(
+        "rag.document_summary.retrieval.started"
+    )
+
+    try:
+        summaries = await retrieve_document_summaries(query, conversation_id)
+        document_summary_names = list(
+            dict.fromkeys(summary.filename for summary in summaries if summary.filename)
+        )
+
+        logger.bind(
+            conversation_id=conversation_id,
+            document_count=len(summaries),
+            document_summary_found=bool(summaries),
+        ).info("rag.document_summary.retrieval.completed")
+
+        return {
+            "document_summaries": summaries,
+            "document_summary_found": bool(summaries),
+            "document_summary_names": document_summary_names,
+        }
+    except Exception:
+        logger.bind(conversation_id=conversation_id).exception(
+            "rag.document_summary.retrieval.failed"
+        )
+        return {
+            "document_summaries": [],
+            "document_summary_found": False,
+            "document_summary_names": [],
+        }
+
+
+async def document_aware_web_query_optimizer_node(state: GraphState) -> dict:
+    optimized_web_query = state.get("optimized_web_query", "")
+    if not optimized_web_query:
+        optimized_web_query = next(
+            (
+                message.content
+                for message in reversed(state["messages"])
+                if isinstance(message, HumanMessage)
+            ),
+            state["messages"][-1].content,
+        )
+
+    document_summaries = state.get("document_summaries", [])
+    conversation_id = str(state.get("conversation_id", ""))
+    logger.bind(conversation_id=conversation_id).info(
+        "web.document_aware_query.optimization.started"
+    )
+
+    if not document_summaries:
+        logger.bind(
+            conversation_id=conversation_id,
+            document_summary_count=0,
+            generated_query=optimized_web_query,
+        ).info("web.document_aware_query.optimization.completed")
+        return {"document_aware_web_query": optimized_web_query}
+
+    try:
+        prompt = get_document_aware_web_query_optimizer_prompt(
+            optimized_web_query=optimized_web_query,
+            document_summaries=document_summaries,
+        )
+        response = await llm.with_structured_output(
+            DocumentAwareWebQuerySchema
+        ).ainvoke([SystemMessage(content=prompt)])
+        document_aware_web_query = (response.web_query or "").strip()
+        if not document_aware_web_query:
+            document_aware_web_query = optimized_web_query
+
+        logger.bind(
+            conversation_id=conversation_id,
+            document_summary_count=len(document_summaries),
+            generated_query=document_aware_web_query,
+        ).info("web.document_aware_query.optimization.completed")
+        return {"document_aware_web_query": document_aware_web_query}
+    except Exception:
+        logger.bind(conversation_id=conversation_id).exception(
+            "web.document_aware_query.optimization.failed"
+        )
+        return {"document_aware_web_query": optimized_web_query}
 
 
 async def evaluator_node(state: GraphState) -> dict:

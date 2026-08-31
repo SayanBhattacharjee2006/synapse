@@ -1,5 +1,5 @@
 from langchain_core.messages import AIMessage, HumanMessage
-from app.ai.schema import RouterType
+from app.ai.schema import DocumentSummarySchema, RouterType
 
 
 def get_system_prompt(
@@ -300,4 +300,39 @@ web_query
 No explanation.
 No reasoning.
 No additional fields.
+"""
+
+
+def get_document_aware_web_query_optimizer_prompt(
+    optimized_web_query: str,
+    document_summaries: list[DocumentSummarySchema],
+) -> str:
+    document_context = "\n\n".join(
+        f"""Document {index}:
+Filename: {summary.filename}
+Summary: {summary.summary}
+Topics: {', '.join(summary.topics)}"""
+        for index, summary in enumerate(document_summaries, start=1)
+    )
+
+    return f"""You generate a concise Web search query.
+
+ORIGINAL WEB-SEARCH INTENT:
+{optimized_web_query}
+
+DOCUMENT-SPECIFIC CONTEXT:
+{document_context}
+
+Use the original Web-search intent as the starting point. Use the document
+summaries, especially their topics, to identify concrete technologies,
+products, concepts, frameworks, libraries, tools, versions, or alternatives
+that are relevant to that intent.
+
+Preserve the original intent while making the query specific and searchable.
+Do not invent technologies or entities that are not supported by the supplied
+document context. When multiple documents are present, use only the relevant
+entities across them; do not blindly include every topic. Keep the query
+reasonably concise.
+
+Do not answer the user's question. Return only the structured Web query.
 """

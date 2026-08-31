@@ -16,6 +16,10 @@ class EvaluatorResponseSchema(BaseModel):
     web_query: str | None = None
 
 
+class DocumentAwareWebQuerySchema(BaseModel):
+    web_query: str
+
+
 
 class DocumentSummarySchema(BaseModel):
     document_id: UUID
