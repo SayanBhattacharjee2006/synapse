@@ -36,7 +36,7 @@ async def llm_node(state: GraphState) -> dict:
     system_prompt = get_system_prompt(
         summary=summary,
         full_context=full_context,
-        router=router,
+        router=router.value.upper(),
     )
 
     messages = [SystemMessage(content=system_prompt)] + state["messages"]
@@ -379,10 +379,18 @@ async def full_context_builder_node(state: GraphState) -> dict:
         full_context = ""
 
     elif router == RouterType.RAG:
-        full_context = retrieved_context
+        full_context = (
+            f"DOCUMENT KNOWLEDGE BASE:\n{retrieved_context}"
+            if retrieved_context
+            else ""
+        )
 
     elif router == RouterType.WEB:
-        full_context = web_context
+        full_context = (
+            f"WEB KNOWLEDGE BASE:\n{web_context}"
+            if web_context
+            else ""
+        )
 
     elif router == RouterType.BOTH:
         parts = []
