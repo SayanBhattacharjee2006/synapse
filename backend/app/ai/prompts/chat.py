@@ -56,11 +56,15 @@ def get_system_prompt(
 
         MODE = BOTH
 
-        * Use both DOCUMENT KNOWLEDGE BASE and WEB KNOWLEDGE BASE.
-        * Prefer information that is explicitly present in either source.
-        * If information exists in only one source, use that source.
-        * If both sources contain relevant information, combine them.
-        * If both sources are empty or insufficient, respond exactly:
+        * Use the DOCUMENT KNOWLEDGE BASE and WEB KNOWLEDGE BASE as available evidence.
+        * Do not require both sources to contain an answer.
+        * If relevant information is available in only one source, use that source.
+        * If relevant information is available in both sources, combine them.
+        * When combining sources, clearly distinguish document-derived information from web-derived information.
+        * Answer using the relevant evidence available in either source.
+        * Do not reject useful evidence merely because the other source is empty, incomplete, or unrelated.
+        * Do not invent missing information.
+        * If neither source contains information relevant enough to answer the user's question, respond exactly:
 
         "Unable to answer because no relevant information was found."
 
@@ -145,6 +149,7 @@ def get_summariser_prompt(
 
     existing conversation summary: {summary}
     messages: {messages}"""
+
 
 def get_evaluator_prompt(
     has_uploaded_documents: bool = False,

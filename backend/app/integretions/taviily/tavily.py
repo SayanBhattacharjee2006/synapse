@@ -10,8 +10,12 @@ async def search_tavily(query: str) -> str:
 def create_search_response(response):
     context = ""
 
-    for idx, result in enumerate(response["results"]):
-        if result['score'] > 0.7:
-            context += f"Result {idx + 1}:\nTitle: {result['title']}\nURL: {result['url']}\ncontent: {result['content']}\n\n"
+    for idx, result in enumerate(response.get("results", [])):
+        context += (
+            f"Result {idx + 1}:\n"
+            f"Title: {result.get('title', '')}\n"
+            f"URL: {result.get('url', '')}\n"
+            f"Content: {result.get('content', '')}\n\n"
+        )
 
     return context

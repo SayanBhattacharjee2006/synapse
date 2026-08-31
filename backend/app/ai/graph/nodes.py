@@ -30,8 +30,9 @@ async def llm_node(state: GraphState) -> dict:
         router=router.value,
         retrieval_found=retrieval_found,
         web_found=web_found,
+        retrieved_context_preview=retrieved_context[:500],
+        web_context_preview=web_context[:500],
     ).info("chat.llm.started")
-
 
 
     system_prompt = get_system_prompt(
@@ -147,9 +148,7 @@ async def evaluator_node(state: GraphState) -> dict:
         has_uploaded_documents=has_uploaded_documents,
     ).info("chat.evaluation.started")
 
-    evaluator_prompt = get_evaluator_prompt(
-        has_uploaded_documents
-    )
+    evaluator_prompt = get_evaluator_prompt(has_uploaded_documents)
 
     response = await router_llm.ainvoke(
         [
@@ -170,7 +169,7 @@ async def evaluator_node(state: GraphState) -> dict:
         "optimized_rag_query": response.rag_query or query,
         "optimized_web_query": response.web_query or query,
     }
- 
+
 
 def route_after_evaluation(state: GraphState):
     decision = state.get("router", "none")
@@ -186,49 +185,67 @@ def route_after_evaluation(state: GraphState):
 
 
 async def web_retreival_node(state: GraphState) -> dict:
-    query = state.get("optimized_web_query", state["messages"][-1].content)
+    query = state.get(
+        "optimized_web_query",
+        state["messages"][-1].content
+    )
+
     logger.bind(
         conversation_id=str(state.get("conversation_id", "")),
     ).info("web.retrieval.started")
-    try:
 
+    try:
         response = await search_tavily(query)
 
+        results = response.get("results", [])
         context = create_search_response(response)
-        if not context:
-            logger.bind(
-                conversation_id=str(state.get("conversation_id", "")),
-                result_count=len(response.get("results", [])),
-            ).info("web.retrieval.completed")
-            return {"web_context": "", "web_found": False, "web_sources": []}
+
+        web_sources = [
+            result["url"]
+            for result in results
+            if result.get("url")
+        ]
+
+        web_found = bool(context)
+
         logger.bind(
             conversation_id=str(state.get("conversation_id", "")),
-            result_count=len(response.get("results", [])),
+            result_count=len(results),
         ).info("web.retrieval.completed")
-        web_sources = [result["url"] for result in response.get("results", [])]
-        if state.get("router", RouterType.NONE) == RouterType.BOTH:
+
+        logger.bind(
+            conversation_id=str(state.get("conversation_id", "")),
+            result_count=len(results),
+            web_found=web_found,
+            sources_count=len(web_sources),
+        ).info("web.retrieval.state")
+
+        if not context:
             return {
-                "web_context": context,
-                "web_found": bool(response.get("results")),
-                "web_sources": web_sources,
+                "web_context": "",
+                "web_found": False,
+                "web_sources": [],
             }
-        else:
-            return {
-                "web_context": context,
-                "web_found": bool(response.get("results")),
-                "web_sources": web_sources,
-                "retrieved_context": context,
-                "retrieval_found": False,
-            }
+
+        return {
+            "web_context": context,
+            "web_found":web_found,
+            "web_sources": web_sources,
+        }
+
     except KeyError as e:
         logger.bind(
             conversation_id=str(state.get("conversation_id", "")),
             error_reason=str(e),
         ).warning("web.retrieval.failed")
-    except Exception as e:
+
+    except Exception:
         logger.bind(
             conversation_id=str(state.get("conversation_id", "")),
         ).exception("web.retrieval.failed")
-    return {"web_context": "", "web_found": False, "web_sources": []}
 
-
+    return {
+        "web_context": "",
+        "web_found": False,
+        "web_sources": [],
+    }

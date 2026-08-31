@@ -1,5 +1,5 @@
 from langgraph.graph import MessagesState
-from app.ai.schema import RouterType
+from app.ai.schema import RouterType, DocumentSummarySchema
 from typing import List
 
 class GraphState(MessagesState):
@@ -20,3 +20,11 @@ class GraphState(MessagesState):
 
     optimized_rag_query: str = ""
     optimized_web_query: str = ""
+
+    document_summaries: List[DocumentSummarySchema] = []
+    document_summary_found: bool = False
+    document_summary_names: List[str] = []
+
+    document_aware_web_query: str = ""
+
+    full_context: str = ""
