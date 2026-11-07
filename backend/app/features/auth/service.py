@@ -1,200 +1,74 @@
 import uuid
-from fastapi import HTTPException, status
-from sqlalchemy import select
-from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.core.logging import logger
-from app.core.security import (
-    create_access_token,
-    hash_password,
-    verify_password,
+from app.features.auth.application.auth_service import AuthService
+from app.features.auth.infrastructure.persistence.models import User
+from app.features.auth.infrastructure.persistence.sqlalchemy_unit_of_work import (
+    SQLAlchemyUnitOfWork,
 )
-from app.features.auth.model import User
-from app.features.auth.schemas import (
+from app.features.auth.presentation.schemas import (
+    AuthResponse,
     UserCreate,
     UserLogin,
-    AuthResponse,
 )
+from app.features.auth.wiring import (
+    get_password_hasher,
+    get_token_service,
+)
+
+
+def _create_service_for_session(db: AsyncSession) -> AuthService:
+    return AuthService(
+        uow=SQLAlchemyUnitOfWork(db),
+        password_hasher=get_password_hasher(),
+        token_service=get_token_service(),
+    )
+
 
 async def authenticate_user(
     db: AsyncSession,
     user_login: UserLogin,
 ) -> User:
+    service = _create_service_for_session(db)
+    return await service.authenticate_user(user_login)
 
-    user = await get_user_by_email(
-        db,
-        user_login.email,
-    )
-
-    credentials_exception = HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Invalid credentials",
-        headers={"WWW-Authenticate": "Bearer"},
-    )
-
-    if user is None:
-
-        logger.bind(
-            email = user_login.email,
-            error_reason = "invalid_credentials",
-        ).warning("auth.login.failed")
-
-        raise credentials_exception
-
-    is_user_verified = verify_password(
-        user_login.password,
-        user.hashed_password,
-    )
-
-    if not is_user_verified:
-
-        logger.bind(
-            email = user_login.email,
-            error_reason = "invalid_credentials",
-        ).warning("auth.login.failed")
-
-        raise credentials_exception
-
-    return user
 
 async def login_user(
     db: AsyncSession,
     user_login: UserLogin,
 ) -> AuthResponse:
+    service = _create_service_for_session(db)
+    return await service.login_user(user_login)
 
-    try: 
-        email = user_login.email.lower()
-
-        logger.bind(
-            email = email,
-        ).info("auth.login.started")
-
-        user = await authenticate_user(
-            db,
-            user_login,
-        )
-
-        access_token = create_access_token(
-            {
-                "sub": str(user.id),
-            }
-        )
-
-        logger.bind(
-            user_id = str(user.id),
-            email = email,
-        ).info("auth.login.completed")
-
-    except HTTPException:
-        raise
-
-    except Exception:
-        logger.bind(
-            email=email,
-        ).exception("auth.login.error")
-        raise
-
-    return AuthResponse(
-        id=user.id,
-        display_name=user.display_name,
-        email=user.email,
-        created_at=user.created_at,
-        updated_at=user.updated_at,
-        access_token=access_token,
-        token_type="bearer",
-    )
 
 async def register_user(
     db: AsyncSession,
     user_create: UserCreate,
 ) -> AuthResponse:
+    service = _create_service_for_session(db)
+    return await service.register_user(user_create)
 
-    email = user_create.email.lower()
-
-    try:
-        logger.bind(
-            email = email,
-        ).info("auth.register.started")
-
-        user = User(
-            email=email,
-            hashed_password=hash_password(user_create.password),
-            display_name=user_create.display_name,
-        )
-
-        db.add(user)
-
-        await db.commit()
-
-        await db.refresh(user)
-
-    except IntegrityError:
-
-        await db.rollback()
-
-        logger.bind(
-            email = email,
-            error_reason = "user_already_exists",
-        ).warning("auth.register.failed")
-
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="User already exists",
-        )
-
-    except Exception:
-        await db.rollback()
-        logger.bind(
-            email=email,
-        ).exception("auth.register.error")
-        raise
-
-    access_token = create_access_token(
-        {
-            "sub": str(user.id),
-        }
-    )
-
-    logger.bind(
-        user_id = str(user.id),
-        email = email,
-    ).info("auth.register.completed")
-    
-
-    return AuthResponse(
-        id=user.id,
-        display_name=user.display_name,
-        email=user.email,
-        created_at=user.created_at,
-        updated_at=user.updated_at,
-        access_token=access_token,
-        token_type="bearer",
-    )
 
 async def get_user_by_id(
     db: AsyncSession,
     user_id: uuid.UUID,
 ) -> User | None:
+    service = _create_service_for_session(db)
+    return await service.get_user_by_id(user_id)
 
-    stmt = select(User).where(
-        User.id == user_id,
-        User.is_deleted == False,
-    )
-
-    user = (await db.scalars(stmt)).one_or_none()
-
-    return user
 
 async def get_user_by_email(
     db: AsyncSession,
     email: str,
 ) -> User | None:
+    service = _create_service_for_session(db)
+    return await service.get_user_by_email(email)
 
-    stmt = select(User).where(
-        User.email == email,
-        User.is_deleted == False,
-    )
 
-    user = (await db.scalars(stmt)).one_or_none()
-
-    return user
+__all__ = [
+    "authenticate_user",
+    "login_user",
+    "register_user",
+    "get_user_by_id",
+    "get_user_by_email",
+    "AuthService",
+]
