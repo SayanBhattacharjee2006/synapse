@@ -3,9 +3,7 @@ from fastapi import (
     APIRouter,
     BackgroundTasks,
     Depends,
-    File,
     HTTPException,
-    UploadFile,
     status,
 )
 
@@ -21,7 +19,6 @@ from app.features.documents.application.exceptions import (
     ConversationAccessError,
     DocumentNotFoundError,
     DocumentUploadInvalidError,
-    ObjectNotFoundError,
 )
 from app.features.documents.presentation.schemas import (
     DocumentResponse,
@@ -191,73 +188,3 @@ async def delete_document_route(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail=str(e)
         )
-
-
-# ------------------------------------------------------------------------------
-# Compatibility Endpoint: Legacy Multipart Upload
-# ------------------------------------------------------------------------------
-
-
-@router.post(
-    "/conversations/{conversation_id}/documents",
-    response_model=DocumentResponse,
-    status_code=status.HTTP_201_CREATED,
-)
-async def upload_document_handler(
-    conversation_id: uuid.UUID,
-    background_tasks: BackgroundTasks,
-    file: UploadFile = File(...),
-    current_user: User = Depends(get_current_user),
-    document_service: DocumentService = Depends(get_document_service),
-    processing_service: DocumentProcessingService = Depends(
-        get_document_processing_service
-    ),
-):
-    try:
-        content = await file.read()
-        file_size = len(content)
-        content_type = file.content_type or "application/octet-stream"
-
-        init_res = await document_service.initiate_upload(
-            conversation_id=conversation_id,
-            user_id=current_user.id,
-            filename=file.filename or "unknown",
-            content_type=content_type,
-            file_size=file_size,
-        )
-
-        # Upload directly to storage on backend for legacy compatibility
-        doc_key = init_res["s3_key"]
-        storage = document_service._storage
-        async with storage._session.client(
-            "s3", **storage._client_kwargs
-        ) as client:
-            await client.put_object(
-                Bucket=storage._bucket_name,
-                Key=doc_key,
-                Body=content,
-                ContentType=content_type,
-            )
-
-        document = await document_service.confirm_upload(
-            conversation_id=conversation_id,
-            document_id=init_res["document_id"],
-            user_id=current_user.id,
-        )
-
-        background_tasks.add_task(
-            processing_service.process_document_by_id, document.id
-        )
-        return document
-
-    except ConversationAccessError as e:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail=str(e)
-        )
-    except DocumentUploadInvalidError as e:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, detail=str(e)
-        )
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-

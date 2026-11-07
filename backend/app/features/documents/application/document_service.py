@@ -1,5 +1,7 @@
-import uuid
 from datetime import datetime, timezone
+from typing import Any
+import uuid
+
 from app.core.config import settings
 from app.core.logging import logger
 from app.features.documents.application.enums import (
@@ -7,7 +9,6 @@ from app.features.documents.application.enums import (
     UploadStatusEnum,
 )
 from app.features.documents.application.exceptions import (
-    ConversationAccessError,
     DocumentNotFoundError,
     DocumentUploadInvalidError,
     ObjectNotFoundError,
@@ -24,7 +25,6 @@ from app.features.documents.application.interfaces.object_storage import (
 from app.features.documents.application.interfaces.unit_of_work import (
     DocumentUnitOfWork,
 )
-from app.features.documents.infrastructure.persistence.models import Document
 from app.integretions.s3.constants import ALLOWED_EXTENSIONS
 
 
@@ -64,7 +64,9 @@ class DocumentService:
 
         # 2. Validate filename and extension
         if not filename or "." not in filename:
-            raise DocumentUploadInvalidError("Valid filename with extension is required")
+            raise DocumentUploadInvalidError(
+                "Valid filename with extension is required"
+            )
 
         ext = filename.rsplit(".", 1)[-1].lower()
         if ext not in ALLOWED_EXTENSIONS:
@@ -89,9 +91,16 @@ class DocumentService:
         document_id = uuid.uuid4()
         s3_key = f"documents/{user_id}/{conversation_id}/{document_id}/{filename}"
 
-        # 6. Create document record with pending status
-        document = Document(
-            id=document_id,
+        # 6. Generate presigned PUT URL before committing database record
+        presigned_url = await self._storage.generate_presigned_upload_url(
+            key=s3_key,
+            content_type=content_type,
+            expires_in=900,
+        )
+
+        # 7. Create document record via repository with pending status
+        await self._uow.documents.create_document(
+            document_id=document_id,
             user_id=user_id,
             conversation_id=conversation_id,
             filename=filename,
@@ -101,16 +110,7 @@ class DocumentService:
             upload_status=UploadStatusEnum.pending,
             processing_status=ProcessingStatusEnum.pending,
         )
-
-        await self._uow.documents.create(document)
         await self._uow.commit()
-
-        # 7. Generate presigned PUT URL
-        presigned_url = await self._storage.generate_presigned_upload_url(
-            key=s3_key,
-            content_type=content_type,
-            expires_in=900,
-        )
 
         logger.bind(
             document_id=str(document_id),
@@ -130,7 +130,7 @@ class DocumentService:
         conversation_id: uuid.UUID,
         document_id: uuid.UUID,
         user_id: uuid.UUID,
-    ) -> Document:
+    ) -> Any:
         logger.bind(
             conversation_id=str(conversation_id),
             document_id=str(document_id),
@@ -164,34 +164,43 @@ class DocumentService:
                 f"Uploaded file size ({actual_size}) exceeds maximum allowed limit"
             )
 
-        # Update document state
-        document.upload_status = UploadStatusEnum.completed
-        document.upload_confirmed_at = datetime.now(timezone.utc)
-        document.file_size = actual_size
-        if metadata.get("content_type"):
-            document.mime_type = metadata["content_type"]
+        # Update document upload state via repository
+        content_type = metadata.get("content_type") or document.mime_type
+        confirmed_at = datetime.now(timezone.utc)
+        await self._uow.documents.update_upload_status(
+            document_id=document_id,
+            status=UploadStatusEnum.completed,
+            confirmed_at=confirmed_at,
+            file_size=actual_size,
+            mime_type=content_type,
+        )
 
-        # Adjust conversation document count
-        await self._conversation_ops.adjust_document_count(
-            conversation_id, user_id, delta=1
+        # Synchronize conversation document count using absolute count
+        active_count = await self._uow.documents.count_by_conversation(
+            conversation_id
+        )
+        await self._conversation_ops.set_document_count(
+            conversation_id, user_id, active_count
         )
 
         await self._uow.commit()
-        await self._uow.refresh(document)
+
+        refreshed = await self._uow.documents.get_by_id(document_id)
+        assert refreshed is not None
 
         logger.bind(
             document_id=str(document_id),
             actual_size=actual_size,
         ).info("document.upload_confirm.completed")
 
-        return document
+        return refreshed
 
     async def get_document(
         self,
         conversation_id: uuid.UUID,
         document_id: uuid.UUID,
         user_id: uuid.UUID,
-    ) -> Document:
+    ) -> Any:
         await self._conversation_ops.validate_ownership(
             conversation_id, user_id
         )
@@ -208,7 +217,7 @@ class DocumentService:
         self,
         conversation_id: uuid.UUID,
         user_id: uuid.UUID,
-    ) -> list[Document]:
+    ) -> list[Any]:
         await self._conversation_ops.validate_ownership(
             conversation_id, user_id
         )
@@ -235,33 +244,29 @@ class DocumentService:
         if document is None:
             raise DocumentNotFoundError(f"Document '{document_id}' not found")
 
-        # 1. Prevent new processing by setting is_deleted = True
+        # 1. Prevent new processing claims by marking is_deleted = True and committing
         if not document.is_deleted:
             await self._uow.documents.mark_deletion_started(document_id)
             await self._uow.commit()
 
-        # 2. Delete indexed knowledge from Qdrant
+        # 2. Delete indexed knowledge from Qdrant (chunks & summary). Propagate failures!
         await self._knowledge_pipeline.delete_document_knowledge(document_id)
 
-        # 3. Delete file object from S3
+        # 3. Delete file object from S3 (idempotent)
         await self._storage.delete_object(document.s3_key)
 
-        # 4. Decrement conversation document count if it was previously confirmed
-        if document.upload_status == UploadStatusEnum.completed:
-            try:
-                await self._conversation_ops.adjust_document_count(
-                    conversation_id, user_id, delta=-1
-                )
-            except Exception:
-                logger.bind(document_id=str(document_id)).warning(
-                    "document.delete.adjust_count_failed"
-                )
+        # 4. Synchronize conversation document count using absolute count
+        active_count = await self._uow.documents.count_by_conversation(
+            conversation_id
+        )
+        await self._conversation_ops.set_document_count(
+            conversation_id, user_id, active_count
+        )
 
-        # 5. Physical deletion of PostgreSQL document record
+        # 5. Physical deletion of PostgreSQL document record only after all cleanups succeed
         await self._uow.documents.hard_delete(document_id)
         await self._uow.commit()
 
         logger.bind(document_id=str(document_id)).info(
             "document.delete.completed"
         )
-

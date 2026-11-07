@@ -31,6 +31,18 @@ class ConversationAdapter(ConversationOperations):
                 f"Conversation '{conversation_id}' not found or inaccessible"
             ) from e
 
+    async def set_document_count(
+        self, conversation_id: uuid.UUID, user_id: uuid.UUID, count: int
+    ) -> None:
+        try:
+            await self._conversation_service.set_document_count(
+                conversation_id, user_id, count
+            )
+        except ConversationNotFoundError as e:
+            raise ConversationAccessError(
+                f"Failed to set document count: conversation '{conversation_id}' not found"
+            ) from e
+
     async def adjust_document_count(
         self, conversation_id: uuid.UUID, user_id: uuid.UUID, delta: int
     ) -> None:
@@ -42,4 +54,3 @@ class ConversationAdapter(ConversationOperations):
             raise ConversationAccessError(
                 f"Failed to adjust document count: conversation '{conversation_id}' not found"
             ) from e
-

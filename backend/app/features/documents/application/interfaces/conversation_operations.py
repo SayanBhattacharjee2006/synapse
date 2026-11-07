@@ -12,9 +12,15 @@ class ConversationOperations(ABC):
         raise NotImplementedError
 
     @abstractmethod
+    async def set_document_count(
+        self, conversation_id: uuid.UUID, user_id: uuid.UUID, count: int
+    ) -> None:
+        """Idempotently set the document count for a conversation to an absolute value."""
+        raise NotImplementedError
+
+    @abstractmethod
     async def adjust_document_count(
         self, conversation_id: uuid.UUID, user_id: uuid.UUID, delta: int
     ) -> None:
-        """Increment or decrement the document count metadata for a conversation."""
+        """Increment or decrement the document count metadata for a conversation (legacy)."""
         raise NotImplementedError
-

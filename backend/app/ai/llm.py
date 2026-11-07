@@ -2,8 +2,8 @@ from app.core.config import settings
 from langchain_openai import ChatOpenAI
 
 from app.ai.schema import EvaluatorResponseSchema
-from app.features.documents.summary.schemas import IntermediateSummary
-from app.features.documents.summary.schemas import DocumentProfile
+from app.ai.rag.summarization.schemas import IntermediateSummary
+from app.ai.rag.summarization.schemas import DocumentProfile
 
 
 llm = ChatOpenAI(

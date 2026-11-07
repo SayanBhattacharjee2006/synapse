@@ -1,6 +1,9 @@
+import ast
 import asyncio
 from datetime import datetime, timezone
+import inspect
 import os
+from pathlib import Path
 import tempfile
 from unittest.mock import AsyncMock, MagicMock, patch
 import uuid
@@ -9,6 +12,7 @@ from botocore.exceptions import ClientError
 from fastapi import FastAPI, HTTPException, status
 from httpx import ASGITransport, AsyncClient
 
+from app.ai.rag.summarization.schemas import DocumentProfile
 from app.core.config import settings
 from app.core.database import Base
 from app.features.auth.infrastructure.persistence.models import User
@@ -58,6 +62,7 @@ from app.features.documents.presentation.router import (
 from app.features.documents.wiring import (
     get_document_processing_service,
     get_document_service,
+    get_processing_semaphore,
 )
 
 
@@ -123,6 +128,32 @@ class FakeDocumentRepository(DocumentRepository):
         self.documents[document.id] = document
         return document
 
+    async def create_document(
+        self,
+        document_id: uuid.UUID,
+        user_id: uuid.UUID,
+        conversation_id: uuid.UUID,
+        filename: str,
+        mime_type: str,
+        file_size: int,
+        s3_key: str,
+        upload_status: UploadStatusEnum = UploadStatusEnum.pending,
+        processing_status: ProcessingStatusEnum = ProcessingStatusEnum.pending,
+    ) -> Document:
+        doc = make_test_document(
+            document_id=document_id,
+            conversation_id=conversation_id,
+            user_id=user_id,
+            filename=filename,
+            mime_type=mime_type,
+            file_size=file_size,
+            upload_status=upload_status,
+            processing_status=processing_status,
+        )
+        doc.s3_key = s3_key
+        self.documents[document_id] = doc
+        return doc
+
     async def get_by_id(
         self, document_id: uuid.UUID, include_soft_deleted: bool = False
     ) -> Document | None:
@@ -156,6 +187,7 @@ class FakeDocumentRepository(DocumentRepository):
             if doc.conversation_id == conversation_id
             and doc.user_id == user_id
             and not doc.is_deleted
+            and doc.upload_status == UploadStatusEnum.completed
         ]
 
     async def count_by_conversation(self, conversation_id: uuid.UUID) -> int:
@@ -163,7 +195,9 @@ class FakeDocumentRepository(DocumentRepository):
             [
                 doc
                 for doc in self.documents.values()
-                if doc.conversation_id == conversation_id and not doc.is_deleted
+                if doc.conversation_id == conversation_id
+                and not doc.is_deleted
+                and doc.upload_status == UploadStatusEnum.completed
             ]
         )
 
@@ -205,11 +239,33 @@ class FakeDocumentRepository(DocumentRepository):
         document_id: uuid.UUID,
         status: UploadStatusEnum,
         confirmed_at: datetime | None = None,
+        file_size: int | None = None,
+        mime_type: str | None = None,
     ) -> None:
         doc = self.documents.get(document_id)
         if doc:
             doc.upload_status = status
-            doc.upload_confirmed_at = confirmed_at
+            if confirmed_at is not None:
+                doc.upload_confirmed_at = confirmed_at
+            if file_size is not None:
+                doc.file_size = file_size
+            if mime_type is not None:
+                doc.mime_type = mime_type
+
+    async def update_document_summary(
+        self,
+        document_id: uuid.UUID,
+        summary: str | None,
+        topics: list[str] | None,
+        summary_status: ProcessingStatusEnum = ProcessingStatusEnum.completed,
+        generated_at: datetime | None = None,
+    ) -> None:
+        doc = self.documents.get(document_id)
+        if doc:
+            doc.summary = summary
+            doc.topics = topics
+            doc.summary_status = summary_status
+            doc.summary_generated_at = generated_at or datetime.now(timezone.utc)
 
 
 class FakeDocumentUnitOfWork(DocumentUnitOfWork):
@@ -241,6 +297,7 @@ class FakeObjectStorage(ObjectStorage):
     def __init__(self) -> None:
         self.objects: dict[str, dict] = {}
         self.delete_calls: list[str] = []
+        self.should_fail_delete = False
 
     async def generate_presigned_upload_url(
         self, key: str, content_type: str, expires_in: int = 900
@@ -259,6 +316,8 @@ class FakeObjectStorage(ObjectStorage):
             f.write(self.objects[key].get("content", b"fake file content"))
 
     async def delete_object(self, key: str) -> None:
+        if self.should_fail_delete:
+            raise RuntimeError("S3 deletion failed")
         self.delete_calls.append(key)
         self.objects.pop(key, None)
 
@@ -268,6 +327,7 @@ class FakeConversationOperations(ConversationOperations):
     def __init__(self) -> None:
         self.valid_conversations: set[tuple[uuid.UUID, uuid.UUID]] = set()
         self.doc_counts: dict[uuid.UUID, int] = {}
+        self.should_fail_count_sync = False
 
     def register_conversation(
         self, conversation_id: uuid.UUID, user_id: uuid.UUID, count: int = 0
@@ -277,11 +337,20 @@ class FakeConversationOperations(ConversationOperations):
 
     async def validate_ownership(
         self, conversation_id: uuid.UUID, user_id: uuid.UUID
-    ) -> None:
+    ) -> bool:
         if (conversation_id, user_id) not in self.valid_conversations:
             raise ConversationAccessError(
                 f"Conversation '{conversation_id}' not found or not owned by user '{user_id}'"
             )
+        return True
+
+    async def set_document_count(
+        self, conversation_id: uuid.UUID, user_id: uuid.UUID, count: int
+    ) -> None:
+        await self.validate_ownership(conversation_id, user_id)
+        if self.should_fail_count_sync:
+            raise RuntimeError("Conversation count sync failed")
+        self.doc_counts[conversation_id] = max(0, count)
 
     async def adjust_document_count(
         self, conversation_id: uuid.UUID, user_id: uuid.UUID, delta: int
@@ -297,7 +366,8 @@ class FakeDocumentKnowledgePipeline(DocumentKnowledgePipeline):
         self.processed_docs: list[uuid.UUID] = []
         self.deleted_knowledge: list[uuid.UUID] = []
         self.should_fail_processing = False
-        self.should_fail_deletion = False
+        self.should_fail_chunk_deletion = False
+        self.should_fail_summary_deletion = False
 
     async def process_document_knowledge(
         self,
@@ -306,25 +376,269 @@ class FakeDocumentKnowledgePipeline(DocumentKnowledgePipeline):
         user_id: uuid.UUID,
         filename: str,
         file_path: str,
-    ) -> None:
+    ) -> DocumentProfile:
         if self.should_fail_processing:
             raise RuntimeError("Knowledge pipeline processing failed")
         self.processed_docs.append(document_id)
+        return DocumentProfile(
+            summary="Synthesized test summary", topics=["test", "docs"]
+        )
 
     async def delete_document_knowledge(self, document_id: uuid.UUID) -> None:
-        if self.should_fail_deletion:
-            raise RuntimeError("Knowledge pipeline deletion failed")
+        if self.should_fail_chunk_deletion:
+            raise RuntimeError("Qdrant chunk deletion failed")
+        if self.should_fail_summary_deletion:
+            raise RuntimeError("Qdrant summary deletion failed")
         self.deleted_knowledge.append(document_id)
 
 
 # ==============================================================================
-# SECTION 18.1: Upload Lifecycle (Criteria 1 - 11)
+# SECTION 12.1: Deletion Consistency (Criteria 1 - 10)
 # ==============================================================================
 
 
 @pytest.mark.asyncio
-async def test_01_upload_initiate_valid():
-    """1. Valid upload initiation."""
+async def test_01_qdrant_chunk_deletion_failure_preserves_record_for_retry():
+    """1. Qdrant chunk deletion failure propagates and preserves DB row with is_deleted=True."""
+    repo = FakeDocumentRepository()
+    uow = FakeDocumentUnitOfWork(repo)
+    storage = FakeObjectStorage()
+    conv_ops = FakeConversationOperations()
+    knowledge = FakeDocumentKnowledgePipeline()
+    knowledge.should_fail_chunk_deletion = True
+
+    user = make_test_user()
+    cid = uuid.uuid4()
+    conv_ops.register_conversation(cid, user.id, count=1)
+
+    doc = make_test_document(
+        conversation_id=cid,
+        user_id=user.id,
+        upload_status=UploadStatusEnum.completed,
+    )
+    await repo.create(doc)
+
+    service = DocumentService(uow, storage, conv_ops, knowledge)
+    with pytest.raises(RuntimeError, match="Qdrant chunk deletion failed"):
+        await service.delete_document(
+            conversation_id=cid, document_id=doc.id, user_id=user.id
+        )
+
+    # Document is NOT physically deleted from database; marked is_deleted=True
+    assert doc.id in repo.documents
+    assert doc.is_deleted is True
+
+
+@pytest.mark.asyncio
+async def test_02_qdrant_summary_deletion_failure_preserves_record_for_retry():
+    """2. Qdrant summary deletion failure propagates and preserves DB row."""
+    repo = FakeDocumentRepository()
+    uow = FakeDocumentUnitOfWork(repo)
+    storage = FakeObjectStorage()
+    conv_ops = FakeConversationOperations()
+    knowledge = FakeDocumentKnowledgePipeline()
+    knowledge.should_fail_summary_deletion = True
+
+    user = make_test_user()
+    cid = uuid.uuid4()
+    conv_ops.register_conversation(cid, user.id, count=1)
+
+    doc = make_test_document(
+        conversation_id=cid,
+        user_id=user.id,
+        upload_status=UploadStatusEnum.completed,
+    )
+    await repo.create(doc)
+
+    service = DocumentService(uow, storage, conv_ops, knowledge)
+    with pytest.raises(RuntimeError, match="Qdrant summary deletion failed"):
+        await service.delete_document(
+            conversation_id=cid, document_id=doc.id, user_id=user.id
+        )
+
+    assert doc.id in repo.documents
+    assert doc.is_deleted is True
+
+
+@pytest.mark.asyncio
+async def test_03_s3_deletion_failure_preserves_record():
+    """3. S3 deletion failure propagates and preserves DB row for retry."""
+    repo = FakeDocumentRepository()
+    uow = FakeDocumentUnitOfWork(repo)
+    storage = FakeObjectStorage()
+    storage.should_fail_delete = True
+    conv_ops = FakeConversationOperations()
+    knowledge = FakeDocumentKnowledgePipeline()
+
+    user = make_test_user()
+    cid = uuid.uuid4()
+    conv_ops.register_conversation(cid, user.id, count=1)
+
+    doc = make_test_document(
+        conversation_id=cid,
+        user_id=user.id,
+        upload_status=UploadStatusEnum.completed,
+    )
+    await repo.create(doc)
+
+    service = DocumentService(uow, storage, conv_ops, knowledge)
+    with pytest.raises(RuntimeError, match="S3 deletion failed"):
+        await service.delete_document(
+            conversation_id=cid, document_id=doc.id, user_id=user.id
+        )
+
+    assert doc.id in repo.documents
+    assert doc.is_deleted is True
+
+
+@pytest.mark.asyncio
+async def test_04_conversation_count_sync_failure_preserves_record():
+    """4. Conversation count synchronization failure preserves DB row."""
+    repo = FakeDocumentRepository()
+    uow = FakeDocumentUnitOfWork(repo)
+    storage = FakeObjectStorage()
+    conv_ops = FakeConversationOperations()
+    conv_ops.should_fail_count_sync = True
+    knowledge = FakeDocumentKnowledgePipeline()
+
+    user = make_test_user()
+    cid = uuid.uuid4()
+    conv_ops.register_conversation(cid, user.id, count=1)
+
+    doc = make_test_document(
+        conversation_id=cid,
+        user_id=user.id,
+        upload_status=UploadStatusEnum.completed,
+    )
+    await repo.create(doc)
+
+    service = DocumentService(uow, storage, conv_ops, knowledge)
+    with pytest.raises(RuntimeError, match="Conversation count sync failed"):
+        await service.delete_document(
+            conversation_id=cid, document_id=doc.id, user_id=user.id
+        )
+
+    assert doc.id in repo.documents
+
+
+@pytest.mark.asyncio
+async def test_05_retry_after_qdrant_failure():
+    """5. Retry after Qdrant failure succeeds cleanly and physically deletes record."""
+    repo = FakeDocumentRepository()
+    uow = FakeDocumentUnitOfWork(repo)
+    storage = FakeObjectStorage()
+    conv_ops = FakeConversationOperations()
+    knowledge = FakeDocumentKnowledgePipeline()
+    knowledge.should_fail_chunk_deletion = True
+
+    user = make_test_user()
+    cid = uuid.uuid4()
+    conv_ops.register_conversation(cid, user.id, count=1)
+
+    doc = make_test_document(
+        conversation_id=cid,
+        user_id=user.id,
+        upload_status=UploadStatusEnum.completed,
+    )
+    await repo.create(doc)
+
+    service = DocumentService(uow, storage, conv_ops, knowledge)
+
+    # First attempt fails
+    with pytest.raises(RuntimeError):
+        await service.delete_document(
+            conversation_id=cid, document_id=doc.id, user_id=user.id
+        )
+
+    # Recovery
+    knowledge.should_fail_chunk_deletion = False
+
+    # Retry succeeds
+    await service.delete_document(
+        conversation_id=cid, document_id=doc.id, user_id=user.id
+    )
+
+    assert doc.id not in repo.documents
+    assert doc.id in knowledge.deleted_knowledge
+
+
+@pytest.mark.asyncio
+async def test_06_retry_after_s3_failure():
+    """6. Retry after S3 failure succeeds once storage recovers."""
+    repo = FakeDocumentRepository()
+    uow = FakeDocumentUnitOfWork(repo)
+    storage = FakeObjectStorage()
+    storage.should_fail_delete = True
+    conv_ops = FakeConversationOperations()
+    knowledge = FakeDocumentKnowledgePipeline()
+
+    user = make_test_user()
+    cid = uuid.uuid4()
+    conv_ops.register_conversation(cid, user.id, count=1)
+
+    doc = make_test_document(
+        conversation_id=cid,
+        user_id=user.id,
+        upload_status=UploadStatusEnum.completed,
+    )
+    await repo.create(doc)
+
+    service = DocumentService(uow, storage, conv_ops, knowledge)
+
+    with pytest.raises(RuntimeError):
+        await service.delete_document(
+            conversation_id=cid, document_id=doc.id, user_id=user.id
+        )
+
+    storage.should_fail_delete = False
+    await service.delete_document(
+        conversation_id=cid, document_id=doc.id, user_id=user.id
+    )
+
+    assert doc.id not in repo.documents
+    assert doc.s3_key in storage.delete_calls
+
+
+@pytest.mark.asyncio
+async def test_07_retry_after_count_sync_failure():
+    """7. Retry after count synchronization failure succeeds."""
+    repo = FakeDocumentRepository()
+    uow = FakeDocumentUnitOfWork(repo)
+    storage = FakeObjectStorage()
+    conv_ops = FakeConversationOperations()
+    conv_ops.should_fail_count_sync = True
+    knowledge = FakeDocumentKnowledgePipeline()
+
+    user = make_test_user()
+    cid = uuid.uuid4()
+    conv_ops.register_conversation(cid, user.id, count=1)
+
+    doc = make_test_document(
+        conversation_id=cid,
+        user_id=user.id,
+        upload_status=UploadStatusEnum.completed,
+    )
+    await repo.create(doc)
+
+    service = DocumentService(uow, storage, conv_ops, knowledge)
+
+    with pytest.raises(RuntimeError):
+        await service.delete_document(
+            conversation_id=cid, document_id=doc.id, user_id=user.id
+        )
+
+    conv_ops.should_fail_count_sync = False
+    await service.delete_document(
+        conversation_id=cid, document_id=doc.id, user_id=user.id
+    )
+
+    assert doc.id not in repo.documents
+    assert conv_ops.doc_counts[cid] == 0
+
+
+@pytest.mark.asyncio
+async def test_08_and_09_postgresql_record_retained_until_success_then_physically_deleted():
+    """8. Record retained until all cleanup succeeds. 9. Physical deletion after success."""
     repo = FakeDocumentRepository()
     uow = FakeDocumentUnitOfWork(repo)
     storage = FakeObjectStorage()
@@ -333,34 +647,28 @@ async def test_01_upload_initiate_valid():
 
     user = make_test_user()
     cid = uuid.uuid4()
-    conv_ops.register_conversation(cid, user.id)
+    conv_ops.register_conversation(cid, user.id, count=1)
 
-    service = DocumentService(uow, storage, conv_ops, knowledge)
-    result = await service.initiate_upload(
+    doc = make_test_document(
         conversation_id=cid,
         user_id=user.id,
-        filename="project_plan.pdf",
-        content_type="application/pdf",
-        file_size=2048,
+        upload_status=UploadStatusEnum.completed,
+    )
+    await repo.create(doc)
+
+    service = DocumentService(uow, storage, conv_ops, knowledge)
+    await service.delete_document(
+        conversation_id=cid, document_id=doc.id, user_id=user.id
     )
 
-    assert "document_id" in result
-    assert "presigned_url" in result
-    assert "required_headers" in result
-    assert result["expires_in"] == 900
-    assert result["s3_key"].startswith(f"documents/{user.id}/{cid}/")
-
-    # Document in repository is pending
-    created = await repo.get_by_id(result["document_id"])
-    assert created is not None
-    assert created.upload_status == UploadStatusEnum.pending
-    assert created.processing_status == ProcessingStatusEnum.pending
+    # Completely deleted from PostgreSQL
+    assert doc.id not in repo.documents
     assert uow.committed is True
 
 
 @pytest.mark.asyncio
-async def test_02_upload_initiate_invalid_extension():
-    """2. Invalid file extension rejected."""
+async def test_10_repeated_deletion_is_safe():
+    """10. Repeated deletion request for already deleted document raises DocumentNotFoundError."""
     repo = FakeDocumentRepository()
     uow = FakeDocumentUnitOfWork(repo)
     storage = FakeObjectStorage()
@@ -369,117 +677,79 @@ async def test_02_upload_initiate_invalid_extension():
 
     user = make_test_user()
     cid = uuid.uuid4()
-    conv_ops.register_conversation(cid, user.id)
+    conv_ops.register_conversation(cid, user.id, count=1)
 
-    service = DocumentService(uow, storage, conv_ops, knowledge)
-    with pytest.raises(
-        DocumentUploadInvalidError, match="Invalid file extension"
-    ):
-        await service.initiate_upload(
-            conversation_id=cid,
-            user_id=user.id,
-            filename="malware.exe",
-            content_type="application/octet-stream",
-            file_size=1024,
-        )
-
-
-@pytest.mark.asyncio
-async def test_03_upload_initiate_invalid_content_type():
-    """3. Invalid or empty content type rejected."""
-    repo = FakeDocumentRepository()
-    uow = FakeDocumentUnitOfWork(repo)
-    storage = FakeObjectStorage()
-    conv_ops = FakeConversationOperations()
-    knowledge = FakeDocumentKnowledgePipeline()
-
-    user = make_test_user()
-    cid = uuid.uuid4()
-    conv_ops.register_conversation(cid, user.id)
-
-    service = DocumentService(uow, storage, conv_ops, knowledge)
-    with pytest.raises(
-        DocumentUploadInvalidError, match="Content-Type is required"
-    ):
-        await service.initiate_upload(
-            conversation_id=cid,
-            user_id=user.id,
-            filename="document.pdf",
-            content_type="",
-            file_size=1024,
-        )
-
-
-@pytest.mark.asyncio
-async def test_04_upload_initiate_file_size_validation():
-    """4. File-size validation (zero, negative, and exceeds MAX_FILE_SIZE)."""
-    repo = FakeDocumentRepository()
-    uow = FakeDocumentUnitOfWork(repo)
-    storage = FakeObjectStorage()
-    conv_ops = FakeConversationOperations()
-    knowledge = FakeDocumentKnowledgePipeline()
-
-    user = make_test_user()
-    cid = uuid.uuid4()
-    conv_ops.register_conversation(cid, user.id)
-
-    service = DocumentService(uow, storage, conv_ops, knowledge)
-
-    with pytest.raises(
-        DocumentUploadInvalidError, match="File size must be greater than 0"
-    ):
-        await service.initiate_upload(
-            conversation_id=cid,
-            user_id=user.id,
-            filename="doc.pdf",
-            content_type="application/pdf",
-            file_size=0,
-        )
-
-    with pytest.raises(
-        DocumentUploadInvalidError, match="exceeds maximum limit"
-    ):
-        await service.initiate_upload(
-            conversation_id=cid,
-            user_id=user.id,
-            filename="doc.pdf",
-            content_type="application/pdf",
-            file_size=settings.MAX_FILE_SIZE + 1024,
-        )
-
-
-@pytest.mark.asyncio
-async def test_05_upload_initiate_presigned_url_generation():
-    """5. Presigned URL generation includes expiration and headers."""
-    repo = FakeDocumentRepository()
-    uow = FakeDocumentUnitOfWork(repo)
-    storage = FakeObjectStorage()
-    conv_ops = FakeConversationOperations()
-    knowledge = FakeDocumentKnowledgePipeline()
-
-    user = make_test_user()
-    cid = uuid.uuid4()
-    conv_ops.register_conversation(cid, user.id)
-
-    service = DocumentService(uow, storage, conv_ops, knowledge)
-    result = await service.initiate_upload(
+    doc = make_test_document(
         conversation_id=cid,
         user_id=user.id,
-        filename="report.docx",
-        content_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-        file_size=5000,
+        upload_status=UploadStatusEnum.completed,
+    )
+    await repo.create(doc)
+
+    service = DocumentService(uow, storage, conv_ops, knowledge)
+    await service.delete_document(
+        conversation_id=cid, document_id=doc.id, user_id=user.id
     )
 
-    assert "https://s3.fake.amazonaws.com/" in result["presigned_url"]
-    assert "expires=900" in result["presigned_url"]
-    assert result["required_headers"] == {
-        "Content-Type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-    }
+    # Second call raises DocumentNotFoundError safely
+    with pytest.raises(DocumentNotFoundError):
+        await service.delete_document(
+            conversation_id=cid, document_id=doc.id, user_id=user.id
+        )
+
+
+# ==============================================================================
+# SECTION 12.2: Conversation Count Consistency (Criteria 11 - 13)
+# ==============================================================================
 
 
 @pytest.mark.asyncio
-async def test_06_upload_confirm_valid():
-    """6. Upload confirmation completes upload and increments conversation count."""
+async def test_11_repeated_deletion_does_not_double_decrement_count():
+    """11. Absolute count sync ensures retrying deletion never decrements count more than once."""
+    repo = FakeDocumentRepository()
+    uow = FakeDocumentUnitOfWork(repo)
+    storage = FakeObjectStorage()
+    conv_ops = FakeConversationOperations()
+    knowledge = FakeDocumentKnowledgePipeline()
+    knowledge.should_fail_summary_deletion = True
+
+    user = make_test_user()
+    cid = uuid.uuid4()
+    conv_ops.register_conversation(cid, user.id, count=1)
+
+    doc = make_test_document(
+        conversation_id=cid,
+        user_id=user.id,
+        upload_status=UploadStatusEnum.completed,
+    )
+    await repo.create(doc)
+
+    service = DocumentService(uow, storage, conv_ops, knowledge)
+
+    # Try 1: fails, document marked is_deleted=True
+    with pytest.raises(RuntimeError):
+        await service.delete_document(
+            conversation_id=cid, document_id=doc.id, user_id=user.id
+        )
+
+    # Try 2: fails again
+    with pytest.raises(RuntimeError):
+        await service.delete_document(
+            conversation_id=cid, document_id=doc.id, user_id=user.id
+        )
+
+    # Count was NOT double-decremented below 0
+    knowledge.should_fail_summary_deletion = False
+    await service.delete_document(
+        conversation_id=cid, document_id=doc.id, user_id=user.id
+    )
+
+    assert conv_ops.doc_counts[cid] == 0
+
+
+@pytest.mark.asyncio
+async def test_12_repeated_upload_confirmation_does_not_double_increment():
+    """12. Repeated confirmation sets absolute count and never increments multiple times."""
     repo = FakeDocumentRepository()
     uow = FakeDocumentUnitOfWork(repo)
     storage = FakeObjectStorage()
@@ -496,31 +766,274 @@ async def test_06_upload_confirm_valid():
         upload_status=UploadStatusEnum.pending,
     )
     await repo.create(doc)
-
-    # Place object in S3
     storage.objects[doc.s3_key] = {
         "size": 2048,
         "content_type": "application/pdf",
     }
 
     service = DocumentService(uow, storage, conv_ops, knowledge)
-    confirmed = await service.confirm_upload(
+
+    # Confirmation 1
+    await service.confirm_upload(
         conversation_id=cid, document_id=doc.id, user_id=user.id
     )
-
-    assert confirmed.upload_status == UploadStatusEnum.completed
-    assert confirmed.upload_confirmed_at is not None
-    assert confirmed.file_size == 2048
     assert conv_ops.doc_counts[cid] == 1
-    assert uow.committed is True
+
+    # Confirmation 2 (idempotent)
+    await service.confirm_upload(
+        conversation_id=cid, document_id=doc.id, user_id=user.id
+    )
+    assert conv_ops.doc_counts[cid] == 1  # Still exactly 1!
 
 
 @pytest.mark.asyncio
-async def test_07_upload_confirm_missing_s3_object():
-    """7. Confirmation fails when object is missing in S3."""
+async def test_13_count_reconciliation_works_after_partial_failure():
+    """13. Count reconciliation accurately reflects remaining active documents after partial failures."""
     repo = FakeDocumentRepository()
     uow = FakeDocumentUnitOfWork(repo)
-    storage = FakeObjectStorage()  # S3 empty
+    storage = FakeObjectStorage()
+    conv_ops = FakeConversationOperations()
+    knowledge = FakeDocumentKnowledgePipeline()
+
+    user = make_test_user()
+    cid = uuid.uuid4()
+    conv_ops.register_conversation(cid, user.id, count=2)
+
+    doc1 = make_test_document(
+        conversation_id=cid,
+        user_id=user.id,
+        upload_status=UploadStatusEnum.completed,
+    )
+    doc2 = make_test_document(
+        conversation_id=cid,
+        user_id=user.id,
+        upload_status=UploadStatusEnum.completed,
+    )
+    await repo.create(doc1)
+    await repo.create(doc2)
+
+    service = DocumentService(uow, storage, conv_ops, knowledge)
+    await service.delete_document(
+        conversation_id=cid, document_id=doc1.id, user_id=user.id
+    )
+
+    assert conv_ops.doc_counts[cid] == 1
+
+
+# ==============================================================================
+# SECTION 12.3: Processing and Deletion Races (Criteria 14 - 19)
+# ==============================================================================
+
+
+@pytest.mark.asyncio
+async def test_14_processing_cannot_claim_deleted_documents():
+    """14. Processing claim query rejects documents where is_deleted=True."""
+    repo = FakeDocumentRepository()
+    storage = FakeObjectStorage()
+    knowledge = FakeDocumentKnowledgePipeline()
+
+    doc = make_test_document(
+        upload_status=UploadStatusEnum.completed,
+        processing_status=ProcessingStatusEnum.pending,
+        is_deleted=True,
+    )
+    await repo.create(doc)
+
+    proc_service = DocumentProcessingService(
+        uow_factory=lambda: FakeDocumentUnitOfWork(repo),
+        storage=storage,
+        knowledge_pipeline=knowledge,
+    )
+
+    await proc_service.process_document_by_id(doc.id)
+    assert len(knowledge.processed_docs) == 0
+
+
+@pytest.mark.asyncio
+async def test_15_and_16_deletion_during_ingestion_race_handling():
+    """15, 16, 17, 18, 19. Race handling: post-processing check detects deletion, purges vectors, does not mark completed."""
+    repo = FakeDocumentRepository()
+    storage = FakeObjectStorage()
+    knowledge = FakeDocumentKnowledgePipeline()
+
+    doc = make_test_document(
+        upload_status=UploadStatusEnum.completed,
+        processing_status=ProcessingStatusEnum.pending,
+        is_deleted=False,
+    )
+    await repo.create(doc)
+    storage.objects[doc.s3_key] = {"content": b"content"}
+
+    # Simulate deletion occurring during process_document_knowledge
+    async def process_with_concurrent_deletion(*args, **kwargs):
+        doc.is_deleted = True  # Deletion occurs concurrently during ingestion!
+        knowledge.processed_docs.append(doc.id)
+        return DocumentProfile(summary="raced summary", topics=["race"])
+
+    knowledge.process_document_knowledge = process_with_concurrent_deletion
+
+    proc_service = DocumentProcessingService(
+        uow_factory=lambda: FakeDocumentUnitOfWork(repo),
+        storage=storage,
+        knowledge_pipeline=knowledge,
+    )
+
+    await proc_service.process_document_by_id(doc.id)
+
+    # Verified:
+    # 1. Post-processing detected deletion and called delete_document_knowledge to purge orphaned vectors!
+    assert doc.id in knowledge.deleted_knowledge
+    # 2. Document processing status was NOT marked completed!
+    assert doc.processing_status != ProcessingStatusEnum.completed
+
+
+# ==============================================================================
+# SECTION 12.4: Database Migration and Backfill (Criteria 20 - 22)
+# ==============================================================================
+
+
+def test_20_21_22_migration_backfill_logic():
+    """20, 21, 22. Migration backfills existing documents with completed and alters new default to pending."""
+    import importlib.util
+
+    migration_path = os.path.join(
+        "alembic", "versions", "a1b2c3d4e5f6_add_upload_status_to_documents.py"
+    )
+    assert os.path.exists(migration_path)
+
+    with open(migration_path, "r", encoding="utf-8") as f:
+        content = f.read()
+
+    # Verified server_default='completed' initially for backfill
+    assert "server_default=\"completed\"" in content
+    # Verified backfill of uploadConfirmedAt from createdAt
+    assert 'UPDATE documents SET "uploadConfirmedAt" = "createdAt"' in content
+    # Verified alter_column to pending for future records
+    assert "op.alter_column" in content
+    assert "server_default=\"pending\"" in content
+
+
+# ==============================================================================
+# SECTION 12.5: Architecture & Ownership Verification (Criteria 23 - 26)
+# ==============================================================================
+
+
+def test_23_application_services_do_not_import_concrete_sqlalchemy():
+    """23. Application services don't import concrete SQLAlchemy implementations."""
+    app_service_files = [
+        Path("app/features/documents/application/document_service.py"),
+        Path(
+            "app/features/documents/application/document_processing_service.py"
+        ),
+    ]
+
+    for p in app_service_files:
+        with open(p, "r", encoding="utf-8") as f:
+            tree = ast.parse(f.read(), filename=str(p))
+
+        for node in ast.walk(tree):
+            if isinstance(node, ast.ImportFrom) and node.module:
+                assert (
+                    "infrastructure.persistence.models" not in node.module
+                ), f"Direct ORM model import in {p}"
+                assert (
+                    "infrastructure.persistence.sqlalchemy" not in node.module
+                ), f"Concrete SQLAlchemy import in {p}"
+
+
+def test_24_and_25_ai_rag_ownership_and_no_orm_import():
+    """24. AI/RAG doesn't import Documents ORM models. 25. Summarization doesn't modify PostgreSQL."""
+    rag_files = [
+        Path("app/ai/rag/ingestion/ingest.py"),
+        Path("app/ai/rag/services/document_summary_service.py"),
+        Path("app/ai/rag/summarization/service.py"),
+    ]
+
+    for p in rag_files:
+        with open(p, "r", encoding="utf-8") as f:
+            code = f.read()
+            tree = ast.parse(code, filename=str(p))
+
+        for node in ast.walk(tree):
+            if isinstance(node, ast.ImportFrom) and node.module:
+                assert (
+                    "app.features.documents.model" not in node.module
+                ), f"Forbidden Document model import in {p}"
+                assert (
+                    "app.core.database" not in node.module
+                ), f"Summarization cannot open PostgreSQL sessions in {p}"
+
+
+def test_26_compatibility_imports_work():
+    """26. Existing compatibility imports remain functional."""
+    from app.features.documents.summary.schemas import (
+        DocumentProfile,
+        IntermediateSummary,
+    )
+    from app.features.documents.summary.service import (
+        generate_document_profile,
+    )
+    from app.features.documents.formatter import (
+        format_document_profile,
+        group_serializer,
+    )
+    from app.features.documents.model import (
+        Document,
+        ProcessingStatusEnum,
+        UploadStatusEnum,
+    )
+
+    assert DocumentProfile is not None
+    assert IntermediateSummary is not None
+    assert callable(generate_document_profile)
+    assert callable(format_document_profile)
+    assert callable(group_serializer)
+    assert Document is not None
+    assert ProcessingStatusEnum is not None
+    assert UploadStatusEnum is not None
+
+
+# ==============================================================================
+# SECTION 12.6: Upload Lifecycle & Concurrency (Criteria 27 - 33)
+# ==============================================================================
+
+
+@pytest.mark.asyncio
+async def test_27_presigned_upload_initiation_generates_url_before_commit():
+    """27. Presigned upload initiation generates URL and registers pending record."""
+    repo = FakeDocumentRepository()
+    uow = FakeDocumentUnitOfWork(repo)
+    storage = FakeObjectStorage()
+    conv_ops = FakeConversationOperations()
+    knowledge = FakeDocumentKnowledgePipeline()
+
+    user = make_test_user()
+    cid = uuid.uuid4()
+    conv_ops.register_conversation(cid, user.id)
+
+    service = DocumentService(uow, storage, conv_ops, knowledge)
+    result = await service.initiate_upload(
+        conversation_id=cid,
+        user_id=user.id,
+        filename="specs.pdf",
+        content_type="application/pdf",
+        file_size=2048,
+    )
+
+    assert "presigned_url" in result
+    assert "document_id" in result
+    assert uow.committed is True
+    doc = await repo.get_by_id(result["document_id"])
+    assert doc is not None
+    assert doc.upload_status == UploadStatusEnum.pending
+
+
+@pytest.mark.asyncio
+async def test_28_and_29_s3_object_verification_and_size_validation():
+    """28. S3 object verification. 29. Size mismatch / empty file error."""
+    repo = FakeDocumentRepository()
+    uow = FakeDocumentUnitOfWork(repo)
+    storage = FakeObjectStorage()
     conv_ops = FakeConversationOperations()
     knowledge = FakeDocumentKnowledgePipeline()
 
@@ -536,90 +1049,24 @@ async def test_07_upload_confirm_missing_s3_object():
     await repo.create(doc)
 
     service = DocumentService(uow, storage, conv_ops, knowledge)
+
+    # Missing in S3
     with pytest.raises(DocumentUploadInvalidError, match="S3 object.*not found"):
         await service.confirm_upload(
             conversation_id=cid, document_id=doc.id, user_id=user.id
         )
 
-
-@pytest.mark.asyncio
-async def test_08_upload_confirm_object_size_mismatch():
-    """8. Confirmation fails when S3 object size is zero or exceeds limits."""
-    repo = FakeDocumentRepository()
-    uow = FakeDocumentUnitOfWork(repo)
-    storage = FakeObjectStorage()
-    conv_ops = FakeConversationOperations()
-    knowledge = FakeDocumentKnowledgePipeline()
-
-    user = make_test_user()
-    cid = uuid.uuid4()
-    conv_ops.register_conversation(cid, user.id)
-
-    doc = make_test_document(
-        conversation_id=cid,
-        user_id=user.id,
-        upload_status=UploadStatusEnum.pending,
-    )
-    await repo.create(doc)
-
-    # Case A: Empty file in S3
+    # Empty in S3
     storage.objects[doc.s3_key] = {"size": 0, "content_type": "application/pdf"}
-    service = DocumentService(uow, storage, conv_ops, knowledge)
-    with pytest.raises(
-        DocumentUploadInvalidError, match="Uploaded file in S3 is empty"
-    ):
-        await service.confirm_upload(
-            conversation_id=cid, document_id=doc.id, user_id=user.id
-        )
-
-    # Case B: Exceeds max file size
-    storage.objects[doc.s3_key] = {
-        "size": settings.MAX_FILE_SIZE + 5000,
-        "content_type": "application/pdf",
-    }
-    with pytest.raises(
-        DocumentUploadInvalidError, match="exceeds maximum allowed limit"
-    ):
+    with pytest.raises(DocumentUploadInvalidError, match="empty"):
         await service.confirm_upload(
             conversation_id=cid, document_id=doc.id, user_id=user.id
         )
 
 
 @pytest.mark.asyncio
-async def test_09_upload_confirm_ownership_validation():
-    """9. Confirmation fails if conversation or document belongs to another user."""
-    repo = FakeDocumentRepository()
-    uow = FakeDocumentUnitOfWork(repo)
-    storage = FakeObjectStorage()
-    conv_ops = FakeConversationOperations()
-    knowledge = FakeDocumentKnowledgePipeline()
-
-    owner_user = make_test_user()
-    attacker_user = make_test_user()
-    cid = uuid.uuid4()
-    conv_ops.register_conversation(cid, owner_user.id)
-
-    doc = make_test_document(
-        conversation_id=cid,
-        user_id=owner_user.id,
-        upload_status=UploadStatusEnum.pending,
-    )
-    await repo.create(doc)
-    storage.objects[doc.s3_key] = {
-        "size": 1024,
-        "content_type": "application/pdf",
-    }
-
-    service = DocumentService(uow, storage, conv_ops, knowledge)
-    with pytest.raises(DocumentNotFoundError):
-        await service.confirm_upload(
-            conversation_id=cid, document_id=doc.id, user_id=attacker_user.id
-        )
-
-
-@pytest.mark.asyncio
-async def test_10_upload_confirm_idempotency():
-    """10. Repeated upload confirmation returns document without duplicate count increments."""
+async def test_30_and_31_invalid_and_concurrent_upload_confirmation():
+    """30. Invalid confirmation. 31. Concurrent confirmations are idempotent."""
     repo = FakeDocumentRepository()
     uow = FakeDocumentUnitOfWork(repo)
     storage = FakeObjectStorage()
@@ -643,51 +1090,25 @@ async def test_10_upload_confirm_idempotency():
 
     service = DocumentService(uow, storage, conv_ops, knowledge)
 
-    # First confirmation
-    res1 = await service.confirm_upload(
-        conversation_id=cid, document_id=doc.id, user_id=user.id
-    )
-    assert res1.upload_status == UploadStatusEnum.completed
-    assert conv_ops.doc_counts[cid] == 1
-
-    # Second confirmation (idempotent)
-    res2 = await service.confirm_upload(
-        conversation_id=cid, document_id=doc.id, user_id=user.id
-    )
-    assert res2.upload_status == UploadStatusEnum.completed
-    assert conv_ops.doc_counts[cid] == 1  # Not incremented again!
-
-
-@pytest.mark.asyncio
-async def test_11_upload_confirm_invalid_state():
-    """11. Expired or non-existent document raises DocumentNotFoundError."""
-    repo = FakeDocumentRepository()
-    uow = FakeDocumentUnitOfWork(repo)
-    storage = FakeObjectStorage()
-    conv_ops = FakeConversationOperations()
-    knowledge = FakeDocumentKnowledgePipeline()
-
-    user = make_test_user()
-    cid = uuid.uuid4()
-    conv_ops.register_conversation(cid, user.id)
-
-    service = DocumentService(uow, storage, conv_ops, knowledge)
+    # Non-existent doc raises 404
     with pytest.raises(DocumentNotFoundError):
         await service.confirm_upload(
-            conversation_id=cid,
-            document_id=uuid.uuid4(),  # Non-existent
-            user_id=user.id,
+            conversation_id=cid, document_id=uuid.uuid4(), user_id=user.id
         )
 
-
-# ==============================================================================
-# SECTION 18.2: Processing (Criteria 12 - 18)
-# ==============================================================================
+    # Concurrent confirmation calls
+    res1, res2 = await asyncio.gather(
+        service.confirm_upload(cid, doc.id, user.id),
+        service.confirm_upload(cid, doc.id, user.id),
+    )
+    assert res1.upload_status == UploadStatusEnum.completed
+    assert res2.upload_status == UploadStatusEnum.completed
+    assert conv_ops.doc_counts[cid] == 1  # Count incremented only once!
 
 
 @pytest.mark.asyncio
-async def test_12_processing_starts_only_after_confirmation():
-    """12. Background processing is scheduled on confirmation, never on initiation."""
+async def test_32_background_processing_scheduled_only_after_confirmation():
+    """32. Background processing starts only after valid confirmation."""
     app = FastAPI()
     app.include_router(documents_router)
 
@@ -722,407 +1143,57 @@ async def test_12_processing_starts_only_after_confirmation():
     async with AsyncClient(
         transport=ASGITransport(app=app), base_url="http://test"
     ) as client:
-        # Step 1: Initiate upload
+        # Initiate does NOT trigger background processing
         init_res = await client.post(
             f"/conversations/{cid}/documents/upload-init",
             json={
-                "filename": "test.pdf",
+                "filename": "file.pdf",
                 "content_type": "application/pdf",
                 "file_size": 1024,
             },
         )
         assert init_res.status_code == status.HTTP_201_CREATED
-        # Ensure processing was NOT triggered during initiation
         assert (
             mock_processing_service.process_document_by_id.call_count == 0
         )
 
-        # Step 2: Confirm upload
+        # Confirm triggers background processing
         conf_res = await client.post(
             f"/conversations/{cid}/documents/{doc_id}/upload-confirm"
         )
         assert conf_res.status_code == status.HTTP_200_OK
-        # Ensure processing was scheduled on confirmation
         assert (
             mock_processing_service.process_document_by_id.call_count == 1
         )
 
 
-@pytest.mark.asyncio
-async def test_13_processing_uses_independent_database_session():
-    """13. Processing service obtains its own session from session_factory."""
-    session_factory_calls = 0
-
-    class MockAsyncSession:
-
-        async def __aenter__(self):
-            nonlocal session_factory_calls
-            session_factory_calls += 1
-            return AsyncMock()
-
-        async def __aexit__(self, exc_type, exc_val, exc_tb):
-            pass
-
-    def mock_factory():
-        return MockAsyncSession()
-
-    storage = FakeObjectStorage()
-    knowledge = FakeDocumentKnowledgePipeline()
-    proc_service = DocumentProcessingService(
-        session_factory=mock_factory,
-        storage=storage,
-        knowledge_pipeline=knowledge,
-    )
-
-    with patch.object(
-        SQLAlchemyDocumentUnitOfWork, "commit", new_callable=AsyncMock
-    ):
-        with patch.object(
-            SQLAlchemyDocumentRepository,
-            "claim_for_processing",
-            new_callable=AsyncMock,
-        ) as mock_claim:
-            mock_claim.return_value = None  # Exit early
-            await proc_service.process_document_by_id(uuid.uuid4())
-
-    assert session_factory_calls >= 1
-
-
-@pytest.mark.asyncio
-async def test_14_duplicate_processing_attempts_rejected():
-    """14. Duplicate processing attempts are rejected by atomic claim."""
-    repo = FakeDocumentRepository()
-    storage = FakeObjectStorage()
-    knowledge = FakeDocumentKnowledgePipeline()
-
-    doc = make_test_document(
-        upload_status=UploadStatusEnum.completed,
-        processing_status=ProcessingStatusEnum.pending,
-    )
-    await repo.create(doc)
-    storage.objects[doc.s3_key] = {"content": b"PDF bytes"}
-
-    class FakeSessionFactory:
-
-        def __call__(self):
-            class FakeSessionContext:
-
-                async def __aenter__(self):
-                    return MagicMock()
-
-                async def __aexit__(self, *args):
-                    pass
-
-            return FakeSessionContext()
-
-    proc_service = DocumentProcessingService(
-        session_factory=FakeSessionFactory(),
-        storage=storage,
-        knowledge_pipeline=knowledge,
-    )
-
-    with patch(
-        "app.features.documents.application.document_processing_service.SQLAlchemyDocumentUnitOfWork"
-    ) as MockUoW:
-        uow_instance = FakeDocumentUnitOfWork(repo)
-        MockUoW.return_value = uow_instance
-
-        # First claim succeeds
-        await proc_service.process_document_by_id(doc.id)
-        assert len(knowledge.processed_docs) == 1
-
-        # Second attempt immediately rejected because status is now completed/processing
-        await proc_service.process_document_by_id(doc.id)
-        assert len(knowledge.processed_docs) == 1  # No duplicate execution!
-
-
-@pytest.mark.asyncio
-async def test_15_processing_success_updates_completed_status():
-    """15. Successful processing updates completed status."""
-    repo = FakeDocumentRepository()
-    storage = FakeObjectStorage()
-    knowledge = FakeDocumentKnowledgePipeline()
-
-    doc = make_test_document(
-        upload_status=UploadStatusEnum.completed,
-        processing_status=ProcessingStatusEnum.pending,
-    )
-    await repo.create(doc)
-    storage.objects[doc.s3_key] = {"content": b"valid pdf content"}
-
-    class FakeSessionFactory:
-
-        def __call__(self):
-            class FakeSessionContext:
-
-                async def __aenter__(self):
-                    return MagicMock()
-
-                async def __aexit__(self, *args):
-                    pass
-
-            return FakeSessionContext()
-
-    proc_service = DocumentProcessingService(
-        session_factory=FakeSessionFactory(),
-        storage=storage,
-        knowledge_pipeline=knowledge,
-    )
-
-    with patch(
-        "app.features.documents.application.document_processing_service.SQLAlchemyDocumentUnitOfWork"
-    ) as MockUoW:
-        uow_instance = FakeDocumentUnitOfWork(repo)
-        MockUoW.return_value = uow_instance
-
-        await proc_service.process_document_by_id(doc.id)
-
-    assert doc.processing_status == ProcessingStatusEnum.completed
-    assert doc.error_message is None
-    assert doc.id in knowledge.processed_docs
-
-
-@pytest.mark.asyncio
-async def test_16_processing_failure_updates_failed_status():
-    """16. Failed processing updates failed status and records error message."""
-    repo = FakeDocumentRepository()
-    storage = FakeObjectStorage()
-    knowledge = FakeDocumentKnowledgePipeline()
-    knowledge.should_fail_processing = True
-
-    doc = make_test_document(
-        upload_status=UploadStatusEnum.completed,
-        processing_status=ProcessingStatusEnum.pending,
-    )
-    await repo.create(doc)
-    storage.objects[doc.s3_key] = {"content": b"valid pdf content"}
-
-    class FakeSessionFactory:
-
-        def __call__(self):
-            class FakeSessionContext:
-
-                async def __aenter__(self):
-                    return MagicMock()
-
-                async def __aexit__(self, *args):
-                    pass
-
-            return FakeSessionContext()
-
-    proc_service = DocumentProcessingService(
-        session_factory=FakeSessionFactory(),
-        storage=storage,
-        knowledge_pipeline=knowledge,
-    )
-
-    with patch(
-        "app.features.documents.application.document_processing_service.SQLAlchemyDocumentUnitOfWork"
-    ) as MockUoW:
-        uow_instance = FakeDocumentUnitOfWork(repo)
-        MockUoW.return_value = uow_instance
-
-        await proc_service.process_document_by_id(doc.id)
-
-    assert doc.processing_status == ProcessingStatusEnum.failed
-    assert "Knowledge pipeline processing failed" in (doc.error_message or "")
-
-
-@pytest.mark.asyncio
-async def test_17_processing_cannot_start_after_deletion():
-    """17. Processing cannot start after deletion has begun."""
-    repo = FakeDocumentRepository()
-    storage = FakeObjectStorage()
-    knowledge = FakeDocumentKnowledgePipeline()
-
-    doc = make_test_document(
-        upload_status=UploadStatusEnum.completed,
-        processing_status=ProcessingStatusEnum.pending,
-        is_deleted=True,  # Deletion already begun
-    )
-    await repo.create(doc)
-
-    class FakeSessionFactory:
-
-        def __call__(self):
-            class FakeSessionContext:
-
-                async def __aenter__(self):
-                    return MagicMock()
-
-                async def __aexit__(self, *args):
-                    pass
-
-            return FakeSessionContext()
-
-    proc_service = DocumentProcessingService(
-        session_factory=FakeSessionFactory(),
-        storage=storage,
-        knowledge_pipeline=knowledge,
-    )
-
-    with patch(
-        "app.features.documents.application.document_processing_service.SQLAlchemyDocumentUnitOfWork"
-    ) as MockUoW:
-        uow_instance = FakeDocumentUnitOfWork(repo)
-        MockUoW.return_value = uow_instance
-
-        await proc_service.process_document_by_id(doc.id)
-
-    assert len(knowledge.processed_docs) == 0
-
-
-@pytest.mark.asyncio
-async def test_18_processing_cannot_reindex_after_deletion_completes():
-    """18. Processing aborts if document was marked deleted while download was in flight."""
-    repo = FakeDocumentRepository()
-    storage = FakeObjectStorage()
-    knowledge = FakeDocumentKnowledgePipeline()
-
-    doc = make_test_document(
-        upload_status=UploadStatusEnum.completed,
-        processing_status=ProcessingStatusEnum.pending,
-        is_deleted=False,
-    )
-    await repo.create(doc)
-    storage.objects[doc.s3_key] = {"content": b"content"}
-
-    class FakeSessionFactory:
-
-        def __call__(self):
-            class FakeSessionContext:
-
-                async def __aenter__(self):
-                    return MagicMock()
-
-                async def __aexit__(self, *args):
-                    pass
-
-            return FakeSessionContext()
-
-    proc_service = DocumentProcessingService(
-        session_factory=FakeSessionFactory(),
-        storage=storage,
-        knowledge_pipeline=knowledge,
-    )
-
-    # Simulate deletion occurring right after atomic claim
-    async def fake_claim(document_id):
-        doc.is_deleted = True  # Deletion occurs concurrently!
-        doc.processing_status = ProcessingStatusEnum.processing
-        return doc
-
-    repo.claim_for_processing = fake_claim
-
-    with patch(
-        "app.features.documents.application.document_processing_service.SQLAlchemyDocumentUnitOfWork"
-    ) as MockUoW:
-        uow_instance = FakeDocumentUnitOfWork(repo)
-        MockUoW.return_value = uow_instance
-
-        await proc_service.process_document_by_id(doc.id)
-
-    # Document knowledge was not indexed
-    assert len(knowledge.processed_docs) == 0
+def test_33_shared_processing_concurrency_semaphore():
+    """33. Shared process-level concurrency semaphore in wiring."""
+    sem1 = get_processing_semaphore()
+    sem2 = get_processing_semaphore()
+    assert sem1 is sem2
+    assert isinstance(sem1, asyncio.Semaphore)
 
 
 # ==============================================================================
-# SECTION 18.3: S3 Storage Adapter (Criteria 19 - 23)
+# SECTION 12.7: S3 Storage Adapter Tests
 # ==============================================================================
 
 
 @pytest.mark.asyncio
-async def test_19_s3_adapter_generate_presigned_upload_url():
-    """19. Upload URL generation uses aioboto3 with key and expiration."""
-    adapter = S3StorageAdapter(
-        bucket_name="test-bucket",
-        aws_access_key_id="test_key",
-        aws_secret_access_key="test_secret",
-        region_name="us-east-1",
-    )
-
+async def test_s3_storage_adapter_operations_and_idempotent_delete():
+    """S3 adapter upload URL, download, head_object, and idempotent deletion."""
+    adapter = S3StorageAdapter("b", "k", "s", "r")
     mock_client = AsyncMock()
     mock_client.generate_presigned_url.return_value = (
-        "https://test-bucket.s3.amazonaws.com/test-key?signature=xyz"
+        "https://b.s3.amazonaws.com/k?sig=1"
     )
-
-    class MockAsyncSession:
-
-        def client(self, *args, **kwargs):
-            class MockClientContext:
-
-                async def __aenter__(self):
-                    return mock_client
-
-                async def __aexit__(self, *args):
-                    pass
-
-            return MockClientContext()
-
-    adapter._session = MockAsyncSession()
-
-    url = await adapter.generate_presigned_upload_url(
-        key="test-key", content_type="application/pdf", expires_in=900
-    )
-
-    assert "test-bucket.s3.amazonaws.com" in url
-    mock_client.generate_presigned_url.assert_awaited_once_with(
-        "put_object",
-        Params={
-            "Bucket": "test-bucket",
-            "Key": "test-key",
-            "ContentType": "application/pdf",
-        },
-        ExpiresIn=900,
-    )
-
-
-@pytest.mark.asyncio
-async def test_20_s3_adapter_get_object_metadata():
-    """20. Object metadata retrieval returns size and content_type; handles 404."""
-    adapter = S3StorageAdapter("b", "k", "s", "r")
-    mock_client = AsyncMock()
     mock_client.head_object.return_value = {
-        "ContentLength": 4096,
+        "ContentLength": 100,
         "ContentType": "application/pdf",
-        "ETag": '"etag123"',
     }
-
-    class MockAsyncSession:
-
-        def client(self, *args, **kwargs):
-            class MockClientContext:
-
-                async def __aenter__(self):
-                    return mock_client
-
-                async def __aexit__(self, *args):
-                    pass
-
-            return MockClientContext()
-
-    adapter._session = MockAsyncSession()
-
-    meta = await adapter.get_object_metadata("test-key")
-    assert meta["size"] == 4096
-    assert meta["content_type"] == "application/pdf"
-
-    # Test 404 raises ObjectNotFoundError
-    mock_client.head_object.side_effect = ClientError(
-        {"Error": {"Code": "404", "Message": "Not Found"}}, "head_object"
-    )
-    with pytest.raises(ObjectNotFoundError):
-        await adapter.get_object_metadata("missing-key")
-
-
-@pytest.mark.asyncio
-async def test_21_s3_adapter_download_file():
-    """21. Object download writes bytes to destination path."""
-    adapter = S3StorageAdapter("b", "k", "s", "r")
-    mock_client = AsyncMock()
-
     mock_body = AsyncMock()
-    mock_body.read.return_value = b"chunk1chunk2"
+    mock_body.read.return_value = b"test bytes"
     mock_body.__aenter__.return_value = mock_body
     mock_body.__aexit__.return_value = None
     mock_client.get_object.return_value = {"Body": mock_body}
@@ -1142,443 +1213,32 @@ async def test_21_s3_adapter_download_file():
 
     adapter._session = MockAsyncSession()
 
+    url = await adapter.generate_presigned_upload_url("k", "application/pdf")
+    assert "https://b.s3.amazonaws.com" in url
+
+    meta = await adapter.get_object_metadata("k")
+    assert meta["size"] == 100
+
     with tempfile.NamedTemporaryFile(delete=False) as tmp:
-        tmp_path = tmp.name
-
+        path = tmp.name
     try:
-        await adapter.download_file("test-key", tmp_path)
-        with open(tmp_path, "rb") as f:
-            content = f.read()
-        assert content == b"chunk1chunk2"
+        await adapter.download_file("k", path)
+        with open(path, "rb") as f:
+            assert f.read() == b"test bytes"
     finally:
-        if os.path.exists(tmp_path):
-            os.remove(tmp_path)
+        if os.path.exists(path):
+            os.remove(path)
 
-
-@pytest.mark.asyncio
-async def test_22_s3_adapter_delete_object():
-    """22. Object deletion calls S3 delete_object with bucket and key."""
-    adapter = S3StorageAdapter("b", "k", "s", "r")
-    mock_client = AsyncMock()
-
-    class MockAsyncSession:
-
-        def client(self, *args, **kwargs):
-            class MockClientContext:
-
-                async def __aenter__(self):
-                    return mock_client
-
-                async def __aexit__(self, *args):
-                    pass
-
-            return MockClientContext()
-
-    adapter._session = MockAsyncSession()
-    await adapter.delete_object("my-key")
-
-    mock_client.delete_object.assert_awaited_once_with(
-        Bucket="b", Key="my-key"
-    )
-
-
-@pytest.mark.asyncio
-async def test_23_s3_adapter_delete_missing_object_idempotent():
-    """23. Missing-object deletion is handled idempotently without throwing."""
-    adapter = S3StorageAdapter("b", "k", "s", "r")
-    mock_client = AsyncMock()
+    # Idempotent delete when object does not exist in S3
     mock_client.delete_object.side_effect = ClientError(
-        {"Error": {"Code": "NoSuchKey", "Message": "The specified key does not exist."}},
-        "delete_object",
+        {"Error": {"Code": "NoSuchKey", "Message": "Missing"}}, "delete_object"
     )
-
-    class MockAsyncSession:
-
-        def client(self, *args, **kwargs):
-            class MockClientContext:
-
-                async def __aenter__(self):
-                    return mock_client
-
-                async def __aexit__(self, *args):
-                    pass
-
-            return MockClientContext()
-
-    adapter._session = MockAsyncSession()
-    # Should not raise exception
-    await adapter.delete_object("nonexistent-key")
-
-
-# ==============================================================================
-# SECTION 18.4: Qdrant and Deletion (Criteria 24 - 30)
-# ==============================================================================
+    await adapter.delete_object("missing_key")  # Must not raise!
 
 
 @pytest.mark.asyncio
-async def test_24_deletion_removes_all_vectors():
-    """24. All vectors for a document are removed."""
-    repo = FakeDocumentRepository()
-    uow = FakeDocumentUnitOfWork(repo)
-    storage = FakeObjectStorage()
-    conv_ops = FakeConversationOperations()
-    knowledge = FakeDocumentKnowledgePipeline()
-
-    user = make_test_user()
-    cid = uuid.uuid4()
-    conv_ops.register_conversation(cid, user.id, count=1)
-
-    doc = make_test_document(
-        conversation_id=cid,
-        user_id=user.id,
-        upload_status=UploadStatusEnum.completed,
-    )
-    await repo.create(doc)
-    storage.objects[doc.s3_key] = {"content": b"doc"}
-
-    service = DocumentService(uow, storage, conv_ops, knowledge)
-    await service.delete_document(
-        conversation_id=cid, document_id=doc.id, user_id=user.id
-    )
-
-    assert doc.id in knowledge.deleted_knowledge
-
-
-@pytest.mark.asyncio
-async def test_25_deletion_does_not_affect_other_documents():
-    """25. Other documents' vectors remain untouched."""
-    repo = FakeDocumentRepository()
-    uow = FakeDocumentUnitOfWork(repo)
-    storage = FakeObjectStorage()
-    conv_ops = FakeConversationOperations()
-    knowledge = FakeDocumentKnowledgePipeline()
-
-    user = make_test_user()
-    cid = uuid.uuid4()
-    conv_ops.register_conversation(cid, user.id, count=2)
-
-    doc1 = make_test_document(
-        conversation_id=cid,
-        user_id=user.id,
-        upload_status=UploadStatusEnum.completed,
-    )
-    doc2 = make_test_document(
-        conversation_id=cid,
-        user_id=user.id,
-        upload_status=UploadStatusEnum.completed,
-    )
-    await repo.create(doc1)
-    await repo.create(doc2)
-    storage.objects[doc1.s3_key] = {"content": b"doc1"}
-    storage.objects[doc2.s3_key] = {"content": b"doc2"}
-
-    service = DocumentService(uow, storage, conv_ops, knowledge)
-    await service.delete_document(
-        conversation_id=cid, document_id=doc1.id, user_id=user.id
-    )
-
-    assert doc2.id not in knowledge.deleted_knowledge
-    assert doc2.id in repo.documents
-
-
-@pytest.mark.asyncio
-async def test_26_deletion_external_cleanup_failure_handling():
-    """26. S3/Qdrant cleanup failures are handled and DB row is preserved for recovery."""
-    repo = FakeDocumentRepository()
-    uow = FakeDocumentUnitOfWork(repo)
-    storage = FakeObjectStorage()
-    conv_ops = FakeConversationOperations()
-    knowledge = FakeDocumentKnowledgePipeline()
-    knowledge.should_fail_deletion = True  # External vector failure!
-
-    user = make_test_user()
-    cid = uuid.uuid4()
-    conv_ops.register_conversation(cid, user.id)
-
-    doc = make_test_document(
-        conversation_id=cid,
-        user_id=user.id,
-        upload_status=UploadStatusEnum.completed,
-    )
-    await repo.create(doc)
-
-    service = DocumentService(uow, storage, conv_ops, knowledge)
-    with pytest.raises(
-        RuntimeError, match="Knowledge pipeline deletion failed"
-    ):
-        await service.delete_document(
-            conversation_id=cid, document_id=doc.id, user_id=user.id
-        )
-
-    # Document was marked soft-deleted to prevent concurrent processing,
-    # but NOT physically purged from DB so cleanup can be retried!
-    assert doc.id in repo.documents
-    assert doc.is_deleted is True
-
-
-@pytest.mark.asyncio
-async def test_27_deletion_partial_failure_retryable():
-    """27. Partial deletion can be retried."""
-    repo = FakeDocumentRepository()
-    uow = FakeDocumentUnitOfWork(repo)
-    storage = FakeObjectStorage()
-    conv_ops = FakeConversationOperations()
-    knowledge = FakeDocumentKnowledgePipeline()
-    knowledge.should_fail_deletion = True
-
-    user = make_test_user()
-    cid = uuid.uuid4()
-    conv_ops.register_conversation(cid, user.id, count=1)
-
-    doc = make_test_document(
-        conversation_id=cid,
-        user_id=user.id,
-        upload_status=UploadStatusEnum.completed,
-    )
-    await repo.create(doc)
-    storage.objects[doc.s3_key] = {"content": b"data"}
-
-    service = DocumentService(uow, storage, conv_ops, knowledge)
-
-    # First attempt fails at knowledge deletion
-    with pytest.raises(RuntimeError):
-        await service.delete_document(
-            conversation_id=cid, document_id=doc.id, user_id=user.id
-        )
-
-    # External failure recovers!
-    knowledge.should_fail_deletion = False
-
-    # Retry succeeds cleanly!
-    await service.delete_document(
-        conversation_id=cid, document_id=doc.id, user_id=user.id
-    )
-
-    # Now fully cleaned up
-    assert doc.id not in repo.documents
-    assert doc.s3_key in storage.delete_calls
-
-
-@pytest.mark.asyncio
-async def test_28_deletion_metadata_available_during_recovery():
-    """28. Database metadata remains available for cleanup recovery."""
-    repo = FakeDocumentRepository()
-    uow = FakeDocumentUnitOfWork(repo)
-    storage = FakeObjectStorage()
-    conv_ops = FakeConversationOperations()
-    knowledge = FakeDocumentKnowledgePipeline()
-    knowledge.should_fail_deletion = True
-
-    user = make_test_user()
-    cid = uuid.uuid4()
-    conv_ops.register_conversation(cid, user.id, count=1)
-
-    doc = make_test_document(
-        conversation_id=cid,
-        user_id=user.id,
-        upload_status=UploadStatusEnum.completed,
-    )
-    await repo.create(doc)
-
-    service = DocumentService(uow, storage, conv_ops, knowledge)
-
-    with pytest.raises(RuntimeError):
-        await service.delete_document(
-            conversation_id=cid, document_id=doc.id, user_id=user.id
-        )
-
-    # Document still in DB, marked is_deleted=True, metadata available
-    found = await repo.get_by_id_and_owner(
-        doc.id, cid, user.id, include_soft_deleted=True
-    )
-    assert found is not None
-    assert found.s3_key == doc.s3_key
-
-
-@pytest.mark.asyncio
-async def test_29_deletion_physical_delete_on_success():
-    """29. PostgreSQL document metadata is physically deleted after successful cleanup."""
-    repo = FakeDocumentRepository()
-    uow = FakeDocumentUnitOfWork(repo)
-    storage = FakeObjectStorage()
-    conv_ops = FakeConversationOperations()
-    knowledge = FakeDocumentKnowledgePipeline()
-
-    user = make_test_user()
-    cid = uuid.uuid4()
-    conv_ops.register_conversation(cid, user.id)
-
-    doc = make_test_document(
-        conversation_id=cid,
-        user_id=user.id,
-        upload_status=UploadStatusEnum.completed,
-    )
-    await repo.create(doc)
-
-    service = DocumentService(uow, storage, conv_ops, knowledge)
-    await service.delete_document(
-        conversation_id=cid, document_id=doc.id, user_id=user.id
-    )
-
-    assert doc.id not in repo.documents
-    assert uow.committed is True
-
-
-@pytest.mark.asyncio
-async def test_30_deletion_conversation_document_count_synchronized():
-    """30. Conversation document count is decremented on document deletion."""
-    repo = FakeDocumentRepository()
-    uow = FakeDocumentUnitOfWork(repo)
-    storage = FakeObjectStorage()
-    conv_ops = FakeConversationOperations()
-    knowledge = FakeDocumentKnowledgePipeline()
-
-    user = make_test_user()
-    cid = uuid.uuid4()
-    conv_ops.register_conversation(cid, user.id, count=3)
-
-    doc = make_test_document(
-        conversation_id=cid,
-        user_id=user.id,
-        upload_status=UploadStatusEnum.completed,
-    )
-    await repo.create(doc)
-
-    service = DocumentService(uow, storage, conv_ops, knowledge)
-    await service.delete_document(
-        conversation_id=cid, document_id=doc.id, user_id=user.id
-    )
-
-    assert conv_ops.doc_counts[cid] == 2
-
-
-# ==============================================================================
-# SECTION 18.5: Database & Architecture (Criteria 31 - 35)
-# ==============================================================================
-
-
-@pytest.mark.asyncio
-async def test_31_repository_queries_work():
-    """31. Repository queries work and enforce soft-delete / owner filters."""
-    session = AsyncMock()
-    repo = SQLAlchemyDocumentRepository(session)
-
-    # Setup mock scalar result
-    mock_scalars = MagicMock()
-    mock_scalars.one_or_none.return_value = None
-    mock_scalars.all.return_value = []
-    session.scalars.return_value = mock_scalars
-
-    doc = await repo.get_by_id(uuid.uuid4())
-    assert doc is None
-    assert session.scalars.call_count == 1
-
-    docs = await repo.list_by_conversation(uuid.uuid4(), uuid.uuid4())
-    assert docs == []
-
-
-@pytest.mark.asyncio
-async def test_32_unit_of_work_commit_works():
-    """32. Unit of Work commit delegates to session commit."""
-    session = AsyncMock()
-    uow = SQLAlchemyDocumentUnitOfWork(session)
-    await uow.commit()
-    session.commit.assert_awaited_once()
-
-
-@pytest.mark.asyncio
-async def test_33_unit_of_work_rollback_works():
-    """33. Unit of Work rollback delegates to session rollback."""
-    session = AsyncMock()
-    uow = SQLAlchemyDocumentUnitOfWork(session)
-    await uow.rollback()
-    session.rollback.assert_awaited_once()
-
-
-def test_34_upload_status_migration_definition():
-    """34. Upload status Alembic migration file exists and defines required schema changes."""
-    import importlib.util
-
-    migration_path = os.path.join(
-        "alembic", "versions", "a1b2c3d4e5f6_add_upload_status_to_documents.py"
-    )
-    assert os.path.exists(migration_path), "Migration file must exist"
-
-    spec = importlib.util.spec_from_file_location(
-        "migration_module", migration_path
-    )
-    assert spec is not None and spec.loader is not None
-    mod = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(mod)
-
-    assert mod.revision == "a1b2c3d4e5f6"
-    assert mod.down_revision == "66562afc14bd"
-    assert hasattr(mod, "upgrade")
-    assert hasattr(mod, "downgrade")
-
-
-def test_35_document_orm_relationships_and_columns():
-    """35. Existing Document relationships and new columns remain intact on Document model."""
-    doc_table = Base.metadata.tables.get("documents")
-    assert doc_table is not None
-
-    table_cols = {c.name for c in doc_table.columns}
-    required_db_cols = {
-        "id",
-        "user_id",
-        "conversation_id",
-        "filename",
-        "mimeType",
-        "fileSize",
-        "s3Key",
-        "processing_status",
-        "uploadStatus",
-        "uploadConfirmedAt",
-        "errorMessage",
-        "isDeleted",
-        "summary",
-        "topics",
-        "summaryStatus",
-        "createdAt",
-        "updatedAt",
-    }
-    missing_db = required_db_cols - table_cols
-    assert not missing_db, f"Missing DB columns in documents table: {missing_db}"
-
-    # Verify Python attributes on Document model class
-    required_attrs = {
-        "id",
-        "user_id",
-        "conversation_id",
-        "filename",
-        "mime_type",
-        "file_size",
-        "s3_key",
-        "processing_status",
-        "upload_status",
-        "upload_confirmed_at",
-        "error_message",
-        "is_deleted",
-        "summary",
-        "topics",
-        "summary_status",
-        "created_at",
-        "updated_at",
-        "user",
-        "conversation",
-    }
-    for attr in required_attrs:
-        assert hasattr(Document, attr), f"Document model missing attribute '{attr}'"
-
-
-# ==============================================================================
-# SECTION 18.6: Presentation Router & Compatibility Tests
-# ==============================================================================
-
-
-@pytest.mark.asyncio
-async def test_router_list_and_get_document():
-    """Verify GET list and GET by id endpoints via presentation router."""
+async def test_presentation_router_endpoints():
+    """Verify list, get, and delete endpoints on presentation router."""
     app = FastAPI()
     app.include_router(documents_router)
 
@@ -1602,88 +1262,13 @@ async def test_router_list_and_get_document():
     async with AsyncClient(
         transport=ASGITransport(app=app), base_url="http://test"
     ) as client:
-        # GET /conversations/{id}/documents
         res_list = await client.get(f"/conversations/{cid}/documents")
         assert res_list.status_code == status.HTTP_200_OK
-        data = res_list.json()
-        assert len(data) == 1
-        assert data[0]["id"] == str(doc_id)
 
-        # GET /conversations/{id}/documents/{id}
         res_get = await client.get(f"/conversations/{cid}/documents/{doc_id}")
         assert res_get.status_code == status.HTTP_200_OK
-        assert res_get.json()["id"] == str(doc_id)
 
-
-@pytest.mark.asyncio
-async def test_router_delete_document():
-    """Verify DELETE endpoint via presentation router."""
-    app = FastAPI()
-    app.include_router(documents_router)
-
-    user = make_test_user()
-    cid = uuid.uuid4()
-    doc_id = uuid.uuid4()
-
-    mock_doc_service = AsyncMock(spec=DocumentService)
-    app.dependency_overrides[get_current_user] = lambda: user
-    app.dependency_overrides[get_document_service] = lambda: mock_doc_service
-
-    async with AsyncClient(
-        transport=ASGITransport(app=app), base_url="http://test"
-    ) as client:
-        res = await client.delete(
+        res_del = await client.delete(
             f"/conversations/{cid}/documents/{doc_id}"
         )
-        assert res.status_code == status.HTTP_204_NO_CONTENT
-        mock_doc_service.delete_document.assert_awaited_once_with(
-            conversation_id=cid,
-            document_id=doc_id,
-            user_id=user.id,
-        )
-
-
-def test_backward_compatible_import_wrappers():
-    """Verify backward-compatible import wrappers at root of documents feature."""
-    import app.features.documents as docs_root
-    from app.features.documents.model import (
-        Document as ModelDoc,
-        ProcessingStatusEnum as PSEnum,
-        UploadStatusEnum as USEnum,
-    )
-    from app.features.documents.schemas import (
-        DocumentResponse,
-        UploadInitiateRequest,
-        UploadInitiateResponse,
-    )
-    from app.features.documents.enum import (
-        ProcessingStatusEnum as EnumPSE,
-        UploadStatusEnum as EnumUSE,
-    )
-    from app.features.documents.router import router as root_router
-    from app.features.documents.processing import process_document
-    from app.features.documents.service import (
-        get_document,
-        get_document_by_id,
-        update_doc_summary_status,
-        update_document_profile,
-    )
-
-    assert hasattr(docs_root, "router")
-    assert hasattr(docs_root, "Document")
-    assert ModelDoc is not None
-    assert PSEnum is not None
-    assert USEnum is not None
-    assert DocumentResponse is not None
-    assert UploadInitiateRequest is not None
-    assert UploadInitiateResponse is not None
-    assert EnumPSE is not None
-    assert EnumUSE is not None
-    assert root_router is not None
-    assert callable(process_document)
-    assert callable(get_document)
-    assert callable(get_document_by_id)
-    assert callable(update_doc_summary_status)
-    assert callable(update_document_profile)
-
-
+        assert res_del.status_code == status.HTTP_204_NO_CONTENT

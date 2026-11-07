@@ -1,218 +1,18 @@
-import time
+from datetime import datetime
 import uuid
-from datetime import datetime, timezone
-from fastapi import UploadFile, HTTPException
-from app.integretions.s3.constants import ALLOWED_EXTENSIONS
-from sqlalchemy import select
-from app.core.config import settings
-from app.integretions.s3.service import upload_to_s3, generate_s3_key, delete_s3_obj
-from app.features.documents.model import Document
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.features.conversations.models import Conversation
-from app.ai.rag.services.document_memory_service import delete_document_chunks
-from app.ai.rag.services.document_summary_service import delete_document_summary
-from app.features.documents.summary.schemas import DocumentProfile
-from app.features.documents.model import ProcessingStatusEnum
-from app.core.logging import logger
 
-
-async def upload_document(
-    db: AsyncSession, file: UploadFile, user_id: uuid.UUID, conversation_id: uuid.UUID
-):
-    logger.bind(
-        user_id=str(user_id),
-        conversation_id=str(conversation_id),
-        filename=file.filename,
-        mime_type=file.content_type,
-        file_size=file.size,
-    ).info("document.upload.started")
-
-    # extension validation
-    if file.filename is None:
-        logger.bind(
-            user_id=str(user_id),
-            conversation_id=str(conversation_id),
-            error_reason="missing_filename",
-        ).warning("document.upload.failed")
-        raise HTTPException(status_code=400, detail="File name is required")
-    ext = file.filename.rsplit(".", 1)[-1].lower()
-    if ext not in ALLOWED_EXTENSIONS:
-        logger.bind(
-            user_id=str(user_id),
-            conversation_id=str(conversation_id),
-            filename=file.filename,
-            error_reason="invalid_file_type",
-        ).warning("document.upload.failed")
-        raise HTTPException(status_code=400, detail="Invalid file type")
-
-    if file.size is not None and file.size > settings.MAX_FILE_SIZE:
-        logger.bind(
-            user_id=str(user_id),
-            conversation_id=str(conversation_id),
-            filename=file.filename,
-            file_size=file.size,
-            error_reason="file_size_exceeded",
-        ).warning("document.upload.failed")
-        raise HTTPException(status_code=400, detail="File size too large")
-
-    stmt = select(Conversation).where(
-        Conversation.id == conversation_id,
-        Conversation.is_deleted == False,
-        Conversation.user_id == user_id,
-    )
-
-    conversation = (await db.scalars(stmt)).one_or_none()
-
-    if conversation is None:
-        logger.bind(
-            user_id=str(user_id),
-            conversation_id=str(conversation_id),
-            error_reason="conversation_not_found",
-        ).warning("document.upload.failed")
-        raise HTTPException(status_code=404, detail="Conversation not found")
-
-    try:
-        # Create document row in postgresql using sqlalchemy
-        document_id = uuid.uuid4()
-        # generate the s3 key
-
-        key = generate_s3_key(
-            str(user_id), str(conversation_id), str(document_id), file.filename
-        )
-
-        document_row = Document(
-            id=document_id,
-            filename=file.filename,
-            mime_type=file.content_type,
-            file_size=file.size or 0,
-            user_id=user_id,
-            conversation_id=conversation_id,
-            s3_key=key,
-        )
-
-        db.add(document_row)
-        await db.flush()  # forces SQLAlchemy to execute pending SQL statements immediately
-        # by default the processing status is pending
-
-        # upload to s3
-
-        await upload_to_s3(file.file, key)
-
-        conversation.document_count += 1
-        await db.commit()
-        await db.refresh(document_row)
-
-        logger.bind(
-            document_id=str(document_row.id),
-            user_id=str(user_id),
-            conversation_id=str(conversation_id),
-            filename=document_row.filename,
-            mime_type=document_row.mime_type,
-            file_size=document_row.file_size,
-        ).info("document.upload.completed")
-
-        return document_row
-
-    except HTTPException:
-        await db.rollback()
-        raise
-
-    except Exception as e:
-        await db.rollback()
-        logger.bind(
-            user_id=str(user_id),
-            conversation_id=str(conversation_id),
-            filename=file.filename,
-        ).exception("document.upload.failed")
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-async def get_document(
-    db: AsyncSession, conversation_id: uuid.UUID, user_id: uuid.UUID
-):
-
-    stmt = select(Conversation).where(
-        Conversation.id == conversation_id,
-        Conversation.is_deleted == False,
-        Conversation.user_id == user_id,
-    )
-
-    conversation = (await db.scalars(stmt)).one_or_none()
-
-    if conversation is None:
-        raise HTTPException(status_code=404, detail="Conversation not found")
-
-    stmt = select(Document).where(
-        Document.conversation_id == conversation_id,
-        Document.is_deleted == False,
-        Document.user_id == user_id,
-    )
-
-    documents = (await db.scalars(stmt)).all()
-
-    return documents
-
-
-async def delete_document(
-    db: AsyncSession,
-    conversation_id: uuid.UUID,
-    document_id: uuid.UUID,
-    user_id: uuid.UUID,
-):
-
-    stmt = select(Document).where(
-        Document.id == document_id,
-        Document.is_deleted == False,
-        Document.user_id == user_id,
-        Document.conversation_id == conversation_id,
-    )
-
-    document = (await db.scalars(stmt)).one_or_none()
-
-    if document is None:
-        raise HTTPException(status_code=404, detail="Document not found")
-
-    try:
-
-        await delete_document_chunks(document_id)
-
-        await delete_document_summary(document_id)
-
-        # delete document row in postgresql using sqlalchemy
-        await delete_s3_obj(document.s3_key)
-        document.is_deleted = True
-
-        stmt = select(Conversation).where(
-            Conversation.id == conversation_id,
-            Conversation.is_deleted == False,
-            Conversation.user_id == user_id,
-        )
-
-        conversation = (await db.scalars(stmt)).one_or_none()
-        document_count = max(conversation.document_count - 1, 0)
-        conversation.document_count = document_count
-
-        await db.commit()
-
-    except HTTPException:
-        await db.rollback()
-        raise
-
-    except Exception as e:
-        await db.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+from app.ai.rag.summarization.schemas import DocumentProfile
+from app.features.documents.application.enums import ProcessingStatusEnum
+from app.features.documents.infrastructure.persistence.models import Document
 
 
 async def update_document_profile(
     doc: Document,
     document_profile: DocumentProfile,
-):
-    
-    # Update the document profile
+) -> Document:
     doc.summary = document_profile.summary
     doc.topics = document_profile.topics
-
-
     return doc
 
 
@@ -220,38 +20,77 @@ async def update_doc_summary_status(
     doc: Document,
     status: ProcessingStatusEnum,
     generated_time: datetime | None = None,
-):
-
+) -> Document:
     doc.summary_status = status
     if generated_time:
         doc.summary_generated_at = generated_time
-
     return doc
 
 
-
-async def get_document_by_id(db: AsyncSession, conversation_id: uuid.UUID, user_id: uuid.UUID, document_id: uuid.UUID):
-    stmt = select(Conversation).where(
-        Conversation.id == conversation_id,
-        Conversation.is_deleted == False,
-        Conversation.user_id == user_id,
+async def get_document_by_id(
+    db: AsyncSession,
+    conversation_id: uuid.UUID,
+    user_id: uuid.UUID,
+    document_id: uuid.UUID,
+) -> Document | None:
+    from app.features.documents.infrastructure.persistence.sqlalchemy_document_repository import (
+        SQLAlchemyDocumentRepository,
     )
 
-    conversation = (await db.scalars(stmt)).one_or_none()
-
-    if conversation is None:
-        raise HTTPException(status_code=404, detail="Conversation not found")
-
-    stmt = select(Document).where(
-        Document.conversation_id == conversation_id,
-        Document.is_deleted == False,
-        Document.user_id == user_id,
-        Document.id == document_id
+    repo = SQLAlchemyDocumentRepository(db)
+    return await repo.get_by_id_and_owner(
+        document_id, conversation_id, user_id
     )
 
-    document = (await db.scalars(stmt)).one_or_none()
 
-    if document is None:
-        raise HTTPException(status_code=404, detail="Document not found")
+async def get_document(
+    db: AsyncSession,
+    conversation_id: uuid.UUID,
+    user_id: uuid.UUID,
+) -> list[Document]:
+    from app.features.documents.infrastructure.persistence.sqlalchemy_document_repository import (
+        SQLAlchemyDocumentRepository,
+    )
 
-    return document
+    repo = SQLAlchemyDocumentRepository(db)
+    return await repo.list_by_conversation(conversation_id, user_id)
+
+
+async def delete_document(
+    db: AsyncSession,
+    conversation_id: uuid.UUID,
+    document_id: uuid.UUID,
+    user_id: uuid.UUID,
+) -> None:
+    from app.features.documents.wiring import (
+        get_conversation_operations,
+        get_document_knowledge_pipeline,
+        get_document_service,
+        get_document_uow,
+        get_object_storage,
+    )
+    from app.features.conversations.application.conversation_service import (
+        ConversationService,
+    )
+    from app.features.conversations.infrastructure.persistence.sqlalchemy_unit_of_work import (
+        SQLAlchemyConversationsUnitOfWork,
+    )
+
+    uow = get_document_uow(db)
+    storage = get_object_storage()
+    conv_uow = SQLAlchemyConversationsUnitOfWork(db)
+    conv_service = ConversationService(conv_uow)
+    conv_ops = get_conversation_operations(conv_service)
+    knowledge = get_document_knowledge_pipeline()
+
+    service = get_document_service(uow, storage, conv_ops, knowledge)
+    await service.delete_document(conversation_id, document_id, user_id)
+
+
+__all__ = [
+    "update_document_profile",
+    "update_doc_summary_status",
+    "get_document_by_id",
+    "get_document",
+    "delete_document",
+]

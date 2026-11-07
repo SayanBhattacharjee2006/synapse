@@ -23,17 +23,19 @@ upload_status_enum = postgresql.ENUM(
 
 
 def upgrade() -> None:
-    """Upgrade schema."""
+    """Upgrade schema and backfill existing documents."""
     upload_status_enum.create(op.get_bind(), checkfirst=True)
+    # 1. Add uploadStatus with server_default='completed' so existing documents receive 'completed'
     op.add_column(
         "documents",
         sa.Column(
             "uploadStatus",
             sa.Enum("pending", "completed", "failed", name="uploadstatusenum"),
             nullable=False,
-            server_default="pending",
+            server_default="completed",
         ),
     )
+    # 2. Add uploadConfirmedAt column
     op.add_column(
         "documents",
         sa.Column(
@@ -42,6 +44,16 @@ def upgrade() -> None:
             nullable=True,
         ),
     )
+    # 3. Backfill uploadConfirmedAt from createdAt for existing documents
+    op.execute(
+        'UPDATE documents SET "uploadConfirmedAt" = "createdAt" WHERE "uploadConfirmedAt" IS NULL'
+    )
+    # 4. Alter server_default to 'pending' for all new initiated uploads
+    op.alter_column(
+        "documents",
+        "uploadStatus",
+        server_default="pending",
+    )
 
 
 def downgrade() -> None:
@@ -49,4 +61,3 @@ def downgrade() -> None:
     op.drop_column("documents", "uploadConfirmedAt")
     op.drop_column("documents", "uploadStatus")
     upload_status_enum.drop(op.get_bind(), checkfirst=True)
-

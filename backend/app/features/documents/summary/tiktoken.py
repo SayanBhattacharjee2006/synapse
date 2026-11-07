@@ -1,11 +1,6 @@
-import tiktoken
-from functools import lru_cache
+from app.ai.rag.summarization.tiktoken import (
+    get_token_count,
+    get_tokenizer,
+)
 
-@lru_cache(maxsize=1) 
-def get_tokenizer():
-    return tiktoken.encoding_for_model("gpt-4o-mini")
-
-
-def get_token_count(text: str) -> int:
-    tokenizer = get_tokenizer()
-    return len(tokenizer.encode(text))
+__all__ = ["get_tokenizer", "get_token_count"]

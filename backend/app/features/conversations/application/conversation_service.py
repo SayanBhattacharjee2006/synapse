@@ -230,3 +230,20 @@ class ConversationService:
         await self._uow.commit()
         await self._uow.refresh(conversation)
         return conversation
+
+    async def set_document_count(
+        self,
+        conversation_id: uuid.UUID,
+        user_id: uuid.UUID,
+        count: int,
+    ) -> Conversation:
+        conversation = await self._uow.conversations.get_by_id_and_user(
+            conversation_id, user_id
+        )
+        if conversation is None:
+            raise ConversationNotFoundError("Conversation not found")
+
+        conversation.document_count = max(count, 0)
+        await self._uow.commit()
+        await self._uow.refresh(conversation)
+        return conversation

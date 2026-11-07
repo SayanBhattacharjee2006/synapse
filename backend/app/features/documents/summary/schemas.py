@@ -1,8 +1,6 @@
-from pydantic import BaseModel
+from app.ai.rag.summarization.schemas import (
+    DocumentProfile,
+    IntermediateSummary,
+)
 
-class DocumentProfile(BaseModel):
-    summary: str | None
-    topics: list[str] | None
-
-class IntermediateSummary(BaseModel):
-    summary: str 
+__all__ = ["DocumentProfile", "IntermediateSummary"]

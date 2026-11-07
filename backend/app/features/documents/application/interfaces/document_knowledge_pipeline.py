@@ -1,6 +1,8 @@
 from abc import ABC, abstractmethod
 import uuid
 
+from app.ai.rag.summarization.schemas import DocumentProfile
+
 
 class DocumentKnowledgePipeline(ABC):
 
@@ -12,14 +14,16 @@ class DocumentKnowledgePipeline(ABC):
         user_id: uuid.UUID,
         filename: str,
         file_path: str,
-    ) -> None:
-        """Process document chunks, ingest vector embeddings, and generate summaries in Qdrant."""
+    ) -> DocumentProfile:
+        """Process document chunks, ingest vector embeddings, and return generated DocumentProfile."""
         raise NotImplementedError
 
     @abstractmethod
     async def delete_document_knowledge(
         self, document_id: uuid.UUID
     ) -> None:
-        """Delete all indexed chunks and summary vectors associated with a document from Qdrant."""
-        raise NotImplementedError
+        """Delete all indexed chunks and summary vectors associated with a document from Qdrant.
 
+        Must propagate errors if deletion fails.
+        """
+        raise NotImplementedError

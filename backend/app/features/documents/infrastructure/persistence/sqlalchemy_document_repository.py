@@ -1,5 +1,5 @@
-import uuid
 from datetime import datetime, timezone
+import uuid
 from sqlalchemy import delete, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -22,11 +22,40 @@ class SQLAlchemyDocumentRepository(DocumentRepository):
         self._session.add(document)
         return document
 
-    async def get_by_id(self, document_id: uuid.UUID) -> Document | None:
-        stmt = select(Document).where(
-            Document.id == document_id,
-            Document.is_deleted == False,
+    async def create_document(
+        self,
+        document_id: uuid.UUID,
+        user_id: uuid.UUID,
+        conversation_id: uuid.UUID,
+        filename: str,
+        mime_type: str,
+        file_size: int,
+        s3_key: str,
+        upload_status: UploadStatusEnum = UploadStatusEnum.pending,
+        processing_status: ProcessingStatusEnum = ProcessingStatusEnum.pending,
+    ) -> Document:
+        document = Document(
+            id=document_id,
+            user_id=user_id,
+            conversation_id=conversation_id,
+            filename=filename,
+            mime_type=mime_type,
+            file_size=file_size,
+            s3_key=s3_key,
+            upload_status=upload_status,
+            processing_status=processing_status,
         )
+        self._session.add(document)
+        return document
+
+    async def get_by_id(
+        self, document_id: uuid.UUID, include_soft_deleted: bool = False
+    ) -> Document | None:
+        conditions = [Document.id == document_id]
+        if not include_soft_deleted:
+            conditions.append(Document.is_deleted == False)
+
+        stmt = select(Document).where(*conditions)
         return (await self._session.scalars(stmt)).one_or_none()
 
     async def get_by_id_and_owner(
@@ -114,11 +143,42 @@ class SQLAlchemyDocumentRepository(DocumentRepository):
         document_id: uuid.UUID,
         status: UploadStatusEnum,
         confirmed_at: datetime | None = None,
+        file_size: int | None = None,
+        mime_type: str | None = None,
     ) -> None:
-        values = {"upload_status": status, "updated_at": datetime.now(timezone.utc)}
+        values: dict = {
+            "upload_status": status,
+            "updated_at": datetime.now(timezone.utc),
+        }
         if confirmed_at is not None:
             values["upload_confirmed_at"] = confirmed_at
+        if file_size is not None:
+            values["file_size"] = file_size
+        if mime_type is not None:
+            values["mime_type"] = mime_type
 
+        stmt = (
+            update(Document)
+            .where(Document.id == document_id)
+            .values(**values)
+        )
+        await self._session.execute(stmt)
+
+    async def update_document_summary(
+        self,
+        document_id: uuid.UUID,
+        summary: str | None,
+        topics: list[str] | None,
+        summary_status: ProcessingStatusEnum = ProcessingStatusEnum.completed,
+        generated_at: datetime | None = None,
+    ) -> None:
+        values: dict = {
+            "summary": summary,
+            "topics": topics,
+            "summary_status": summary_status,
+            "summary_generated_at": generated_at or datetime.now(timezone.utc),
+            "updated_at": datetime.now(timezone.utc),
+        }
         stmt = (
             update(Document)
             .where(Document.id == document_id)
@@ -140,4 +200,3 @@ class SQLAlchemyDocumentRepository(DocumentRepository):
     async def hard_delete(self, document_id: uuid.UUID) -> None:
         stmt = delete(Document).where(Document.id == document_id)
         await self._session.execute(stmt)
-

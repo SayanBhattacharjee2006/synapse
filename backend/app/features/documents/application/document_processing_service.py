@@ -1,11 +1,11 @@
 import asyncio
+from datetime import datetime, timezone
 import os
 from pathlib import Path
 import tempfile
 from typing import Callable
 import uuid
 
-from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.logging import logger
 from app.features.documents.application.enums import ProcessingStatusEnum
 from app.features.documents.application.interfaces.document_knowledge_pipeline import (
@@ -14,8 +14,8 @@ from app.features.documents.application.interfaces.document_knowledge_pipeline i
 from app.features.documents.application.interfaces.object_storage import (
     ObjectStorage,
 )
-from app.features.documents.infrastructure.persistence.sqlalchemy_unit_of_work import (
-    SQLAlchemyDocumentUnitOfWork,
+from app.features.documents.application.interfaces.unit_of_work import (
+    DocumentUnitOfWork,
 )
 
 
@@ -23,15 +23,15 @@ class DocumentProcessingService:
 
     def __init__(
         self,
-        session_factory: Callable[[], AsyncSession],
+        uow_factory: Callable[[], DocumentUnitOfWork],
         storage: ObjectStorage,
         knowledge_pipeline: DocumentKnowledgePipeline,
-        max_concurrency: int = 3,
+        semaphore: asyncio.Semaphore | None = None,
     ) -> None:
-        self._session_factory = session_factory
+        self._uow_factory = uow_factory
         self._storage = storage
         self._knowledge_pipeline = knowledge_pipeline
-        self._semaphore = asyncio.Semaphore(max_concurrency)
+        self._semaphore = semaphore or asyncio.Semaphore(3)
 
     async def process_document_by_id(self, document_id: uuid.UUID) -> None:
         """Process document using an independent database session with concurrency limiting."""
@@ -41,22 +41,19 @@ class DocumentProcessingService:
     async def _execute_processing(self, document_id: uuid.UUID) -> None:
         temp_file_path: str | None = None
 
-        # 1. Claim document for processing using an independent session
-        async with self._session_factory() as session:
-            uow = SQLAlchemyDocumentUnitOfWork(session)
+        # 1. Claim document for processing using an independent Unit of Work
+        async with self._uow_factory() as uow:
             document = await uow.documents.claim_for_processing(document_id)
             if document is None:
                 logger.bind(document_id=str(document_id)).info(
                     "document.processing.claim_skipped_or_already_active"
                 )
                 return
-            await uow.commit()
-
-            # Capture needed fields for processing
             conversation_id = document.conversation_id
             user_id = document.user_id
             filename = document.filename
             s3_key = document.s3_key
+            await uow.commit()
 
         logger.bind(
             document_id=str(document_id),
@@ -65,9 +62,8 @@ class DocumentProcessingService:
 
         # 2. Execute download and knowledge pipeline
         try:
-            # Check deletion boundary before heavy processing
-            async with self._session_factory() as session:
-                uow = SQLAlchemyDocumentUnitOfWork(session)
+            # Check deletion boundary before expensive operations
+            async with self._uow_factory() as uow:
                 current = await uow.documents.get_by_id(document_id)
                 if current is None or current.is_deleted:
                     logger.bind(document_id=str(document_id)).warning(
@@ -82,26 +78,46 @@ class DocumentProcessingService:
 
             await self._storage.download_file(s3_key, temp_file_path)
 
-            # Delegate knowledge indexing and summarization to AI/RAG adapter
-            await self._knowledge_pipeline.process_document_knowledge(
-                document_id=document_id,
-                conversation_id=conversation_id,
-                user_id=user_id,
-                filename=filename,
-                file_path=temp_file_path,
+            # Delegate knowledge indexing and algorithmic summarization to adapter
+            doc_profile = (
+                await self._knowledge_pipeline.process_document_knowledge(
+                    document_id=document_id,
+                    conversation_id=conversation_id,
+                    user_id=user_id,
+                    filename=filename,
+                    file_path=temp_file_path,
+                )
             )
 
-            # 3. Final state update: Completed
-            async with self._session_factory() as session:
-                uow = SQLAlchemyDocumentUnitOfWork(session)
-                current = await uow.documents.get_by_id(document_id)
-                if current is not None and not current.is_deleted:
-                    await uow.documents.update_processing_status(
-                        document_id,
-                        status=ProcessingStatusEnum.completed,
-                        error_message=None,
+            # 3. Post-processing deletion race check
+            async with self._uow_factory() as uow:
+                current = await uow.documents.get_by_id(
+                    document_id, include_soft_deleted=True
+                )
+                if current is None or current.is_deleted:
+                    logger.bind(document_id=str(document_id)).warning(
+                        "document.processing.race_detected_cleaning_up"
                     )
-                    await uow.commit()
+                    # Clean up vectors that were indexed during race
+                    await self._knowledge_pipeline.delete_document_knowledge(
+                        document_id
+                    )
+                    return
+
+                # Persist summary profile and mark completed
+                await uow.documents.update_document_summary(
+                    document_id=document_id,
+                    summary=doc_profile.summary if doc_profile else None,
+                    topics=doc_profile.topics if doc_profile else None,
+                    summary_status=ProcessingStatusEnum.completed,
+                    generated_at=datetime.now(timezone.utc),
+                )
+                await uow.documents.update_processing_status(
+                    document_id,
+                    status=ProcessingStatusEnum.completed,
+                    error_message=None,
+                )
+                await uow.commit()
 
             logger.bind(document_id=str(document_id)).info(
                 "document.processing.completed"
@@ -111,16 +127,18 @@ class DocumentProcessingService:
             logger.bind(document_id=str(document_id)).exception(
                 "document.processing.failed"
             )
-            # Update failed status in database
             try:
-                async with self._session_factory() as session:
-                    uow = SQLAlchemyDocumentUnitOfWork(session)
-                    await uow.documents.update_processing_status(
-                        document_id,
-                        status=ProcessingStatusEnum.failed,
-                        error_message=str(e),
+                async with self._uow_factory() as uow:
+                    current = await uow.documents.get_by_id(
+                        document_id, include_soft_deleted=True
                     )
-                    await uow.commit()
+                    if current is not None and not current.is_deleted:
+                        await uow.documents.update_processing_status(
+                            document_id,
+                            status=ProcessingStatusEnum.failed,
+                            error_message=str(e),
+                        )
+                        await uow.commit()
             except Exception:
                 logger.bind(document_id=str(document_id)).warning(
                     "document.processing.status_update_failed"
@@ -132,4 +150,3 @@ class DocumentProcessingService:
                     os.remove(temp_file_path)
                 except OSError:
                     pass
-
