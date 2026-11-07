@@ -1,207 +1,50 @@
+from typing import AsyncIterator
 import uuid
-import json
-import langsmith as ls
 from fastapi import Request
-from sqlalchemy import select, update
-from app.features.chat.schemas import ChatRequest
-from langchain_core.messages import HumanMessage, SystemMessage
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.features.conversations.models import Message, Conversation
-from app.ai.llm import llm
-from app.ai.rag.services.summary_memory_sevice import store_summary
-from app.core.logging import logger
 
-
-STATUS_BY_NODE = {
-    "evaluator": {
-        "status": "routing",
-        "message": "Understanding your question...",
-    },
-    "retreiver": {
-        "status": "searching_documents",
-        "message": "Searching your uploaded documents...",
-    },
-    "web": {
-        "status": "searching_web",
-        "message": "Searching the web...",
-    },
-    "llm": {
-        "status": "generating",
-        "message": "Generating answer...",
-    },
-    "error": {
-        "status": "error",
-        "message": "Something went wrong while processing your request.",
-    },
-}
+from app.features.chat.application.chat_service import ChatService
+from app.features.chat.infrastructure.ai.langgraph_chat_engine import (
+    LangGraphChatEngine,
+    STATUS_BY_NODE,
+)
+from app.features.chat.infrastructure.integrations.conversation_adapter import (
+    ConversationAdapter,
+)
+from app.features.chat.presentation.schemas import ChatRequest
+from app.features.chat.presentation.streaming import format_sse_stream
+from app.features.chat.wiring import get_chat_service
+from app.features.conversations.application.conversation_service import (
+    ConversationService,
+)
+from app.features.conversations.infrastructure.persistence.sqlalchemy_unit_of_work import (
+    SQLAlchemyConversationsUnitOfWork,
+)
 
 
 async def stream_chat(
     request: Request,
     conversation_id: uuid.UUID,
     message: ChatRequest,
-    db: AsyncSession,  
+    db: AsyncSession,
     user_id: uuid.UUID,
-):
-    graph = request.app.state.graph
-    config = {"configurable": {"thread_id": str(conversation_id)}}
+) -> AsyncIterator[str]:
+    """Backward compatibility wrapper for legacy stream_chat callers."""
+    uow = SQLAlchemyConversationsUnitOfWork(db)
+    conv_service = ConversationService(uow=uow)
+    conv_adapter = ConversationAdapter(conversation_service=conv_service)
+    chat_engine = LangGraphChatEngine(graph=request.app.state.graph)
+    service = ChatService(
+        chat_engine=chat_engine, conversation_ops=conv_adapter
+    )
 
-    try: 
-        stmt = (
-            select(Message)
-            .join(Conversation, Conversation.id == Message.conversation_id)
-            .where(
-                Message.conversation_id == conversation_id,
-                Message.is_deleted == False,
-                Conversation.user_id == user_id,
-                Conversation.is_deleted == False,
-            )
-        )
-
-        messages = (await db.scalars(stmt)).all()
-
-        is_first_message = len(messages) == 1
-        summary = None
-        retrieved_document_names = []
-        retrieval_found = False
-        web_sources = []
-        web_found = False
-
-        stmt = select(Conversation).where(
-            Conversation.id == conversation_id,
-            Conversation.is_deleted == False,
-            Conversation.user_id == user_id,
-        )
-
-        conversation = (await db.scalars(stmt)).one_or_none()
-        has_uploaded_documents = conversation.document_count > 0
-
-        logger.bind(
-            conversation_id=str(conversation_id),
-            user_id=str(user_id),
-            has_uploaded_documents=has_uploaded_documents,
-        ).info("chat.response.stream.started")
-
-        metadata = {
-            "conversation_id": str(conversation_id),
-            "user_id": str(user_id),
-            "has_uploaded_documents": has_uploaded_documents,
-        }
-        with ls.tracing_context(
-            metadata=metadata,
-            tags=['synapse', 'chat'],
-        ):
-            async for event in graph.astream_events(
-                {
-                    "messages": [HumanMessage(content=message.content)],
-                    "conversation_id": str(conversation_id),
-                    "has_uploaded_documents": has_uploaded_documents,
-                },
-                config=config,
-                version="v2",
-            ):
-                if event["event"] == "on_chain_start":
-                    node = event.get("metadata", {}).get("langgraph_node")
-                    status = STATUS_BY_NODE.get(node)
-
-                    if status:
-                        yield (
-                            f"event: status\n"
-                            f"data: {json.dumps(status)}\n\n"
-                        )
-
-                if event["event"] == "on_chain_end":
-                    node = event.get("metadata", {}).get("langgraph_node") or event.get("name")
-                    output = event.get("data", {}).get("output")
-
-                    if isinstance(output, dict):
-                        if node == "summarisation" or event.get("name") == "summarisation":
-                            summary = output.get("summary", "")
-
-                        if node == "retreiver" or event.get("name") == "retreiver":
-                            retrieval_found = output.get("retrieval_found", False)
-                            docs = (
-                                output.get("retrieved_document_names")
-                                or output.get("retieved_document_names")
-                                or []
-                            )
-                            if isinstance(docs, list):
-                                retrieved_document_names = docs
-
-                        if node == "web" or event.get("name") == "web":
-                            web_found = output.get("web_found", False)
-                            urls = output.get("web_sources", [])
-                            if isinstance(urls, list):
-                                web_sources = urls
-
-                if (
-                    event["event"] == "on_chat_model_stream"
-                    and event.get("metadata", {}).get("langgraph_node") == "llm"
-                ):
-                    token = event["data"]["chunk"].content
-                    if token:
-                        yield f"data: {token}\n\n"
-
-        update_values = {}
-
-        if summary:
-            update_values["summary"] = summary
-
-        if is_first_message:
-            title_response = await llm.ainvoke(
-                [
-                    SystemMessage(
-                        content="You are a title generator. Generate a short title of maximum 5 words for this conversation. Return only the title, nothing else."
-                    ),
-                    HumanMessage(content=message.content),
-                ]
-            )
-
-            title = title_response.content
-            update_values["title"] = title
-            update_values["slug"] = title.lower().replace(" ", "-")
-
-        await db.execute(
-            update(Conversation)
-            .where(
-                Conversation.id == conversation_id,
-                Conversation.is_deleted == False,
-                Conversation.user_id == user_id,
-            )
-            .values(**update_values)
-        )
-        await db.commit()
-
-        if summary:
-            await store_summary(summary, conversation_id, user_id)
-
-        if is_first_message:
-            yield f"event: title\ndata: {json.dumps({'title': title})}\n\n"
-
-        if retrieval_found:
-            yield f"event: retrieval_found\ndata: {json.dumps({'retrieved_doc_names': retrieved_document_names})}\n\n"
-
-        if web_found:
-            yield f"event: web_found\ndata: {json.dumps({'web_sources': web_sources})}\n\n"
-
-        logger.bind(
-            conversation_id=str(conversation_id),
-            user_id=str(user_id),
-            summary_updated=bool(summary),
-            title_generated=is_first_message,
-        ).info("chat.response.stream.completed")
+    event_stream = service.stream_chat(
+        conversation_id=conversation_id,
+        user_id=user_id,
+        content=message.content,
+    )
+    async for chunk in format_sse_stream(event_stream):
+        yield chunk
 
 
-    except Exception:
-        logger.bind(
-            conversation_id=str(conversation_id),
-            user_id=str(user_id),
-            error_reason="exception",
-        ).exception("chat.response.stream.failed")
-
-        yield (
-            "event: error\n"
-            f"data: {json.dumps(STATUS_BY_NODE['error'])}\n\n"
-        )
-
-    yield "data: [DONE]\n\n"
+__all__ = ["ChatService", "stream_chat", "get_chat_service", "STATUS_BY_NODE"]

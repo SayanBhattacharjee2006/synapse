@@ -5,7 +5,7 @@ from contextlib import asynccontextmanager
 from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver # type: ignore
 from app.core.config import settings
 from app.ai.graph.graph import get_graph
-from app.features.chat.router import router as chat_router
+from app.features.chat.presentation.router import router as chat_router
 from fastapi.middleware.cors import CORSMiddleware
 from app.features.auth.router import router as auth_router
 from app.ai.rag.collections import create_collections

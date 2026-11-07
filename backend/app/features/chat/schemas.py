@@ -1,3 +1,3 @@
-from pydantic import BaseModel
-class ChatRequest(BaseModel):
-    content: str
+from app.features.chat.presentation.schemas import ChatRequest
+
+__all__ = ["ChatRequest"]
