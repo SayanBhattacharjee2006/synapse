@@ -37,12 +37,15 @@ class ChatService:
         conversation_id: uuid.UUID,
         user_id: uuid.UUID,
         content: str,
+        context: ConversationContext | None = None,
     ) -> AsyncIterator[ChatEvent]:
-        """Stream normalized ChatEvents for the user's message."""
-        try:
-            context = await self.validate_access(conversation_id, user_id)
-        except ConversationNotFoundError:
-            raise
+        """Stream normalized ChatEvents for the user's message.
+          Reuses validated context when supplied by the router.
+          Falls back to validation for callers that don't supply it."""
+        if context is None:
+            context = await self.validate_access(
+                conversation_id, user_id
+        )
 
         needs_title = not bool(context.title and context.title.strip())
         summary: str | None = None

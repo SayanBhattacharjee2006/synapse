@@ -24,7 +24,7 @@ async def chat(
     # Validate conversation access before returning StreamingResponse.
     # Nonexistent or inaccessible conversations must return HTTP 404 directly.
     try:
-        await chat_service.validate_access(
+        conversation_context = await chat_service.validate_access(
             conversation_id=conversation_id,
             user_id=current_user.id,
         )
@@ -39,6 +39,7 @@ async def chat(
         conversation_id=conversation_id,
         user_id=current_user.id,
         content=data.content,
+        context=conversation_context,
     )
 
     return StreamingResponse(
