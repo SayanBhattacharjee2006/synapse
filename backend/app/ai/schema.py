@@ -1,6 +1,7 @@
-from pydantic import BaseModel
 from enum import Enum
-from uuid import UUID
+from pydantic import BaseModel
+
+from app.ai.rag.retrieval.schemas import DocumentSummarySchema
 
 
 class RouterType(str, Enum):
@@ -20,11 +21,9 @@ class DocumentAwareWebQuerySchema(BaseModel):
     web_query: str
 
 
-
-class DocumentSummarySchema(BaseModel):
-    document_id: UUID
-    conversation_id: str
-    user_id: UUID
-    summary: str
-    topics: list[str]
-    filename: str
+__all__ = [
+    "RouterType",
+    "EvaluatorResponseSchema",
+    "DocumentAwareWebQuerySchema",
+    "DocumentSummarySchema",
+]

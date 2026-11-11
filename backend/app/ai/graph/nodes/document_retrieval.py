@@ -1,7 +1,7 @@
 from langchain_core.messages import HumanMessage
 
 from app.ai.graph.state import GraphState
-from app.ai.rag.retreival.retreival_service import (
+from app.ai.rag.retrieval.service import (
     retreive_context,
     retrieve_document_summaries,
 )

@@ -1,4 +1,3 @@
-from qdrant_client import AsyncQdrantClient
-from app.core.config import settings
+from app.ai.rag.vector_store.client import client
 
-client = AsyncQdrantClient(url=settings.QDRANT_URL)
+__all__ = ["client"]
