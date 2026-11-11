@@ -1,7 +1,5 @@
 import asyncio
 
-from qdrant_client import models
-
 from app.ai.rag.embeddings import (
     embed_late_interaction_query,
     embed_sparse_query,
@@ -27,19 +25,10 @@ async def retrieve_document_summaries(
     dense_vector = await get_dense_embeddings().aembed_query(query)
     sparse_vector = await asyncio.to_thread(embed_sparse_query, query)
 
-    doc_sum_filter = models.Filter(
-        must=[
-            models.FieldCondition(
-                key="conversation_id",
-                match=models.MatchValue(value=conversation_id),
-            )
-        ]
-    )
-
     results = await query_document_summaries(
         dense_vector=dense_vector,
         sparse_vector=sparse_vector,
-        query_filter=doc_sum_filter,
+        conversation_id=conversation_id,
         limit=k,
     )
 
@@ -83,35 +72,21 @@ async def retreive_context(
     sparse_vector = await asyncio.to_thread(embed_sparse_query, query)
     multi_vector = await asyncio.to_thread(embed_late_interaction_query, query)
 
-    if document_summaries:
-        doc_chunk_filter = models.Filter(
-            must=[
-                models.FieldCondition(
-                    key="document_id",
-                    match=models.MatchAny(
-                        any=[
-                            str(document_summary.document_id)
-                            for document_summary in document_summaries
-                        ]
-                    ),
-                ),
-            ]
-        )
-    else:
-        doc_chunk_filter = models.Filter(
-            must=[
-                models.FieldCondition(
-                    key="conversation_id",
-                    match=models.MatchValue(value=conversation_id),
-                ),
-            ]
-        )
+    document_ids = (
+        [
+            str(summary.document_id)
+            for summary in document_summaries
+        ]
+        if document_summaries
+        else None
+    )
 
     results = await query_document_chunks(
         dense_vector=dense_vector,
         sparse_vector=sparse_vector,
         multi_vector=multi_vector,
-        query_filter=doc_chunk_filter,
+        document_ids=document_ids,
+        conversation_id=conversation_id,
         limit=k,
     )
 

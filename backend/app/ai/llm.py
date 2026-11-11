@@ -3,7 +3,7 @@ from langchain_openai import ChatOpenAI
 
 from app.ai.schema import EvaluatorResponseSchema
 from app.ai.rag.summarization.schemas import IntermediateSummary
-from app.ai.rag.summarization.schemas import DocumentProfile
+from app.contracts.document_profile import DocumentProfile
 
 
 llm = ChatOpenAI(

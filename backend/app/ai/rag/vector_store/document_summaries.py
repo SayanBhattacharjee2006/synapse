@@ -6,7 +6,7 @@ from qdrant_client import models
 
 from app.ai.rag.embeddings import embed_sparse_query, get_dense_embeddings
 from app.ai.rag.summarization.formatter import format_document_profile
-from app.ai.rag.summarization.schemas import DocumentProfile
+from app.contracts.document_profile import DocumentProfile
 from app.ai.rag.vector_store.client import client
 from app.core.config import settings
 from app.core.logging import logger
@@ -93,10 +93,19 @@ async def delete_document_summary(document_id: uuid.UUID) -> None:
 async def query_document_summaries(
     dense_vector: list[float],
     sparse_vector: Any,
-    query_filter: models.Filter,
+    conversation_id: str,
     limit: int = 5,
 ) -> Any:
     """Execute hybrid vector search across document summaries with RRF fusion."""
+    query_filter = models.Filter(
+        must=[
+            models.FieldCondition(
+                key="conversation_id",
+                match=models.MatchValue(value=conversation_id),
+            )
+        ]
+    )
+
     return await client.query_points(
         collection_name=settings.QDRANT_DOCUMENT_SUMMARY_COLLECTION,
         prefetch=[

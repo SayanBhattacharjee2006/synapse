@@ -78,10 +78,30 @@ async def query_document_chunks(
     dense_vector: list[float],
     sparse_vector: Any,
     multi_vector: Any,
-    query_filter: models.Filter,
+    document_ids: list[str] | None,
+    conversation_id: str,
     limit: int = 5,
 ) -> Any:
     """Execute hybrid vector search across document chunks with prefetch and late-interaction reranking."""
+    if document_ids:
+        query_filter = models.Filter(
+            must=[
+                models.FieldCondition(
+                    key="document_id",
+                    match=models.MatchAny(any=document_ids),
+                )
+            ]
+        )
+    else:
+        query_filter = models.Filter(
+            must=[
+                models.FieldCondition(
+                    key="conversation_id",
+                    match=models.MatchValue(value=conversation_id),
+                )
+            ]
+        )
+
     return await client.query_points(
         collection_name=settings.QDRANT_DOCUMENTS_COLLECTION,
         prefetch=[

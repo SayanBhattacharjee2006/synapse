@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 import uuid
 
-from app.ai.rag.summarization.schemas import DocumentProfile
+from app.contracts.document_profile import DocumentProfile
 
 
 class DocumentKnowledgePipeline(ABC):

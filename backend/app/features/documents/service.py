@@ -2,7 +2,7 @@ from datetime import datetime
 import uuid
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.ai.rag.summarization.schemas import DocumentProfile
+from app.contracts.document_profile import DocumentProfile
 from app.features.documents.application.enums import ProcessingStatusEnum
 from app.features.documents.infrastructure.persistence.models import Document
 

@@ -7,10 +7,8 @@ from app.ai.rag.summarization.prompts import (
     get_final_reducer_prompt,
     get_intermediate_reducer_prompt,
 )
-from app.ai.rag.summarization.schemas import (
-    DocumentProfile,
-    IntermediateSummary,
-)
+from app.ai.rag.summarization.schemas import IntermediateSummary
+from app.contracts.document_profile import DocumentProfile
 from app.core.logging import logger
 
 

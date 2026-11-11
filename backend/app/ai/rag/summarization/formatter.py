@@ -1,9 +1,7 @@
 from langchain_core.documents import Document
 
-from app.ai.rag.summarization.schemas import (
-    DocumentProfile,
-    IntermediateSummary,
-)
+from app.ai.rag.summarization.schemas import IntermediateSummary
+from app.contracts.document_profile import DocumentProfile
 
 
 def format_document_profile(document_profile: DocumentProfile) -> str:

@@ -3,6 +3,7 @@ from typing import Callable
 from fastapi import Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.ai.rag.document_knowledge_service import DocumentKnowledgeService
 from app.core.config import settings
 from app.core.database import session_factory
 from app.core.dependencies import get_db
@@ -85,7 +86,7 @@ def get_conversation_operations(
 
 
 def get_document_knowledge_pipeline() -> DocumentKnowledgePipeline:
-    return DocumentKnowledgePipelineAdapter()
+    return DocumentKnowledgePipelineAdapter(DocumentKnowledgeService())
 
 
 def get_document_service(

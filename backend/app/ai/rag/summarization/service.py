@@ -4,10 +4,8 @@ from langchain_core.documents import Document
 from app.ai.rag.summarization.grouping import group_by_tokens
 from app.ai.rag.summarization.mapper import summarize_group
 from app.ai.rag.summarization.reducer import final_reducer, intermediate_reducer
-from app.ai.rag.summarization.schemas import (
-    DocumentProfile,
-    IntermediateSummary,
-)
+from app.ai.rag.summarization.schemas import IntermediateSummary
+from app.contracts.document_profile import DocumentProfile
 from app.core.config import settings
 from app.core.logging import logger
 
