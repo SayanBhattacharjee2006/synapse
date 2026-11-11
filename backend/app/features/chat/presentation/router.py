@@ -39,7 +39,6 @@ async def chat(
         conversation_id=conversation_id,
         user_id=current_user.id,
         content=data.content,
-        context=conversation_context,
     )
 
     return StreamingResponse(

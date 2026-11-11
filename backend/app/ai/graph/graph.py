@@ -1,17 +1,27 @@
 from langgraph.graph import END, START, StateGraph
-from app.ai.graph.state import GraphState
-from app.ai.graph.nodes import (
+
+from app.ai.graph.nodes.context import (
+    full_context_builder_node,
     llm_node,
+)
+from app.ai.graph.nodes.conversation import (
     summarisation_node,
-    retreive_context_node,
-    evaluator_node,
-    route_after_evaluation,
-    route_after_document_summary,
+)
+from app.ai.graph.nodes.document_retrieval import (
     document_summary_retrieval_node,
+    retreive_context_node,
+)
+from app.ai.graph.nodes.routing import (
+    evaluator_node,
+    route_after_document_summary,
+    route_after_evaluation,
+)
+from app.ai.graph.nodes.web_retrieval import (
     document_aware_web_query_optimizer_node,
     web_retreival_node,
-    full_context_builder_node,
 )
+from app.ai.graph.state import GraphState
+
 
 def get_graph(postgresCheckpointer):
     builder = StateGraph(GraphState)
@@ -22,9 +32,13 @@ def get_graph(postgresCheckpointer):
     builder.add_node("evaluator", evaluator_node)
     builder.add_node("doc_summary_retrieval", document_summary_retrieval_node)
     builder.add_node("retreiver", retreive_context_node)
-    builder.add_node("doc_aware_web_optimizer", document_aware_web_query_optimizer_node)
+    builder.add_node(
+        "doc_aware_web_optimizer", document_aware_web_query_optimizer_node
+    )
     builder.add_node("web", web_retreival_node)
-    builder.add_node("full_context_builder", full_context_builder_node, defer=True)
+    builder.add_node(
+        "full_context_builder", full_context_builder_node, defer=True
+    )
 
     # Linear: START → summarisation → evaluator
     builder.add_edge(START, "summarisation")
