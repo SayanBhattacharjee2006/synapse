@@ -10,12 +10,8 @@ from app.core.database import Base
 from app.features.auth.application.auth_service import AuthService
 from app.features.auth.application.interfaces.password_hasher import PasswordHasher
 from app.features.auth.application.interfaces.token_service import TokenService
-from app.features.auth.application.interfaces.unit_of_work import AuthUnitOfWork
 from app.features.auth.application.interfaces.user_repository import UserRepository
 from app.features.auth.infrastructure.persistence.models import User
-from app.features.auth.infrastructure.persistence.sqlalchemy_unit_of_work import (
-    SQLAlchemyUnitOfWork,
-)
 from app.features.auth.infrastructure.persistence.sqlalchemy_user_repository import (
     SQLAlchemyUserRepository,
 )
@@ -142,39 +138,45 @@ async def test_sqlalchemy_user_repository_operations():
 
 
 # ==============================================================================
-# 9 & 10. Database Commit and Rollback (Unit of Work)
+# 9 & 10. Database Commit and Rollback (SQLAlchemyUserRepository.create)
 # ==============================================================================
 
 @pytest.mark.asyncio
-async def test_unit_of_work_commit_and_rollback():
+async def test_sqlalchemy_user_repository_create_commit():
     session = AsyncMock()
-    uow = SQLAlchemyUnitOfWork(session)
+    repo = SQLAlchemyUserRepository(session)
 
-    assert isinstance(uow.users, UserRepository)
+    user = User(
+        email="test@example.com",
+        hashed_password="hash",
+        display_name="Test",
+    )
 
-    # Commit
-    await uow.commit()
+    created = await repo.create(user)
+
+    session.add.assert_called_once_with(user)
+    session.flush.assert_awaited_once()
+    session.refresh.assert_awaited_once_with(user)
     session.commit.assert_awaited_once()
-
-    # Rollback
-    await uow.rollback()
-    session.rollback.assert_awaited_once()
-
-    # Refresh
-    obj = object()
-    await uow.refresh(obj)
-    session.refresh.assert_awaited_once_with(obj)
+    assert created == user
 
 
 @pytest.mark.asyncio
-async def test_unit_of_work_context_manager_rollback_on_failure():
+async def test_sqlalchemy_user_repository_create_rollback_on_failure():
     session = AsyncMock()
-    uow = SQLAlchemyUnitOfWork(session)
+    session.flush.side_effect = IntegrityError("statement", "params", Exception("duplicate key"))
+    repo = SQLAlchemyUserRepository(session)
 
-    with pytest.raises(ValueError):
-        async with uow:
-            raise ValueError("Something broke")
+    user = User(
+        email="test@example.com",
+        hashed_password="hash",
+        display_name="Test",
+    )
 
+    with pytest.raises(IntegrityError):
+        await repo.create(user)
+
+    session.add.assert_called_once_with(user)
     session.rollback.assert_awaited_once()
 
 
@@ -184,8 +186,7 @@ async def test_unit_of_work_context_manager_rollback_on_failure():
 
 @pytest.mark.asyncio
 async def test_auth_service_register_success():
-    uow = AsyncMock(spec=AuthUnitOfWork)
-    uow.users = AsyncMock(spec=UserRepository)
+    user_repo = AsyncMock(spec=UserRepository)
 
     saved_user = None
 
@@ -197,7 +198,7 @@ async def test_auth_service_register_success():
         user.updated_at = datetime.now(timezone.utc)
         return user
 
-    uow.users.create.side_effect = fake_create
+    user_repo.create.side_effect = fake_create
 
     hasher = MagicMock(spec=PasswordHasher)
     hasher.hash.return_value = "hashed_pass_xyz"
@@ -206,7 +207,7 @@ async def test_auth_service_register_success():
     token_svc.create_access_token.return_value = "mocked-jwt-token"
 
     auth_service = AuthService(
-        uow=uow,
+        user_repo=user_repo,
         password_hasher=hasher,
         token_service=token_svc,
     )
@@ -224,18 +225,15 @@ async def test_auth_service_register_success():
     assert response.access_token == "mocked-jwt-token"
     assert response.token_type == "bearer"
 
-    uow.users.create.assert_awaited_once()
-    uow.commit.assert_awaited_once()
-    uow.refresh.assert_awaited_once()
+    user_repo.create.assert_awaited_once()
     hasher.hash.assert_called_once_with("securePassword123")
 
 
 @pytest.mark.asyncio
 async def test_auth_service_register_duplicate_user_triggers_rollback():
-    uow = AsyncMock(spec=AuthUnitOfWork)
-    uow.users = AsyncMock(spec=UserRepository)
-    # Simulate unique constraint violation on commit
-    uow.commit.side_effect = IntegrityError("statement", "params", Exception("duplicate key"))
+    user_repo = AsyncMock(spec=UserRepository)
+    # Simulate unique constraint violation from repository
+    user_repo.create.side_effect = IntegrityError("statement", "params", Exception("duplicate key"))
 
     hasher = MagicMock(spec=PasswordHasher)
     hasher.hash.return_value = "hashed_pass"
@@ -243,7 +241,7 @@ async def test_auth_service_register_duplicate_user_triggers_rollback():
     token_svc = MagicMock(spec=TokenService)
 
     auth_service = AuthService(
-        uow=uow,
+        user_repo=user_repo,
         password_hasher=hasher,
         token_service=token_svc,
     )
@@ -260,7 +258,7 @@ async def test_auth_service_register_duplicate_user_triggers_rollback():
     assert exc_info.value.status_code == status.HTTP_400_BAD_REQUEST
     assert exc_info.value.detail == "User already exists"
 
-    uow.rollback.assert_awaited_once()
+    user_repo.create.assert_awaited_once()
 
 
 # ==============================================================================
@@ -269,8 +267,7 @@ async def test_auth_service_register_duplicate_user_triggers_rollback():
 
 @pytest.mark.asyncio
 async def test_auth_service_login_success():
-    uow = AsyncMock(spec=AuthUnitOfWork)
-    uow.users = AsyncMock(spec=UserRepository)
+    user_repo = AsyncMock(spec=UserRepository)
 
     user_id = uuid.uuid4()
     now = datetime.now(timezone.utc)
@@ -282,7 +279,7 @@ async def test_auth_service_login_success():
         created_at=now,
         updated_at=now,
     )
-    uow.users.get_by_email.return_value = user
+    user_repo.get_by_email.return_value = user
 
     hasher = MagicMock(spec=PasswordHasher)
     hasher.verify.return_value = True
@@ -291,7 +288,7 @@ async def test_auth_service_login_success():
     token_svc.create_access_token.return_value = "access_token_123"
 
     auth_service = AuthService(
-        uow=uow,
+        user_repo=user_repo,
         password_hasher=hasher,
         token_service=token_svc,
     )
@@ -307,8 +304,7 @@ async def test_auth_service_login_success():
 
 @pytest.mark.asyncio
 async def test_auth_service_login_invalid_password():
-    uow = AsyncMock(spec=AuthUnitOfWork)
-    uow.users = AsyncMock(spec=UserRepository)
+    user_repo = AsyncMock(spec=UserRepository)
 
     user = User(
         id=uuid.uuid4(),
@@ -316,7 +312,7 @@ async def test_auth_service_login_invalid_password():
         display_name="User Name",
         hashed_password="correct_hash",
     )
-    uow.users.get_by_email.return_value = user
+    user_repo.get_by_email.return_value = user
 
     hasher = MagicMock(spec=PasswordHasher)
     hasher.verify.return_value = False  # Bad password
@@ -324,7 +320,7 @@ async def test_auth_service_login_invalid_password():
     token_svc = MagicMock(spec=TokenService)
 
     auth_service = AuthService(
-        uow=uow,
+        user_repo=user_repo,
         password_hasher=hasher,
         token_service=token_svc,
     )
@@ -340,15 +336,14 @@ async def test_auth_service_login_invalid_password():
 
 @pytest.mark.asyncio
 async def test_auth_service_login_nonexistent_user():
-    uow = AsyncMock(spec=AuthUnitOfWork)
-    uow.users = AsyncMock(spec=UserRepository)
-    uow.users.get_by_email.return_value = None
+    user_repo = AsyncMock(spec=UserRepository)
+    user_repo.get_by_email.return_value = None
 
     hasher = MagicMock(spec=PasswordHasher)
     token_svc = MagicMock(spec=TokenService)
 
     auth_service = AuthService(
-        uow=uow,
+        user_repo=user_repo,
         password_hasher=hasher,
         token_service=token_svc,
     )

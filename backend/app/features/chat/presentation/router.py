@@ -2,8 +2,8 @@ import uuid
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.responses import StreamingResponse
 
-from app.features.auth.dependencies import get_current_user
-from app.features.auth.model import User
+from app.features.auth.infrastructure.persistence.models import User
+from app.features.auth.presentation.dependencies import get_current_user
 from app.features.chat.application.chat_service import ChatService
 from app.features.chat.application.exceptions import ConversationNotFoundError
 from app.features.chat.presentation.schemas import ChatRequest

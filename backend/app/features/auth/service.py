@@ -2,8 +2,8 @@ import uuid
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.features.auth.application.auth_service import AuthService
 from app.features.auth.infrastructure.persistence.models import User
-from app.features.auth.infrastructure.persistence.sqlalchemy_unit_of_work import (
-    SQLAlchemyUnitOfWork,
+from app.features.auth.infrastructure.persistence.sqlalchemy_user_repository import (
+    SQLAlchemyUserRepository,
 )
 from app.features.auth.presentation.schemas import (
     AuthResponse,
@@ -18,7 +18,7 @@ from app.features.auth.wiring import (
 
 def _create_service_for_session(db: AsyncSession) -> AuthService:
     return AuthService(
-        uow=SQLAlchemyUnitOfWork(db),
+        user_repo=SQLAlchemyUserRepository(db),
         password_hasher=get_password_hasher(),
         token_service=get_token_service(),
     )

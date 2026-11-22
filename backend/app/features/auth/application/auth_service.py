@@ -4,7 +4,7 @@ from sqlalchemy.exc import IntegrityError
 from app.core.logging import logger
 from app.features.auth.application.interfaces.password_hasher import PasswordHasher
 from app.features.auth.application.interfaces.token_service import TokenService
-from app.features.auth.application.interfaces.unit_of_work import AuthUnitOfWork
+from app.features.auth.application.interfaces.user_repository import UserRepository
 from app.features.auth.infrastructure.persistence.models import User
 from app.features.auth.presentation.schemas import (
     AuthResponse,
@@ -17,11 +17,11 @@ class AuthService:
 
     def __init__(
         self,
-        uow: AuthUnitOfWork,
+        user_repo: UserRepository,
         password_hasher: PasswordHasher,
         token_service: TokenService,
     ) -> None:
-        self._uow = uow
+        self._user_repo = user_repo
         self._password_hasher = password_hasher
         self._token_service = token_service
 
@@ -120,13 +120,9 @@ class AuthService:
                 display_name=user_create.display_name,
             )
 
-            await self._uow.users.create(user)
-            await self._uow.commit()
-            await self._uow.refresh(user)
+            await self._user_repo.create(user)
 
         except IntegrityError:
-            await self._uow.rollback()
-
             logger.bind(
                 email=email,
                 error_reason="user_already_exists",
@@ -137,7 +133,6 @@ class AuthService:
                 detail="User already exists",
             )
         except Exception:
-            await self._uow.rollback()
             logger.bind(
                 email=email,
             ).exception("auth.register.error")
@@ -168,11 +163,11 @@ class AuthService:
         self,
         user_id: uuid.UUID,
     ) -> User | None:
-        return await self._uow.users.get_by_id(user_id)
+        return await self._user_repo.get_by_id(user_id)
 
     async def get_user_by_email(
         self,
         email: str,
     ) -> User | None:
-        return await self._uow.users.get_by_email(email.lower())
+        return await self._user_repo.get_by_email(email.lower())
 

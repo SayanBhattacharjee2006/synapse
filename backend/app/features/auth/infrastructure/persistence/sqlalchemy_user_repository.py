@@ -25,6 +25,13 @@ class SQLAlchemyUserRepository(UserRepository):
         return (await self._session.scalars(stmt)).one_or_none()
 
     async def create(self, user: User) -> User:
-        self._session.add(user)
-        return user
+        try:
+            self._session.add(user)
+            await self._session.flush()
+            await self._session.refresh(user)
+            await self._session.commit()
+            return user
+        except Exception:
+            await self._session.rollback()
+            raise
 

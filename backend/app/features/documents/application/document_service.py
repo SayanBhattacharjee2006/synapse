@@ -25,7 +25,7 @@ from app.features.documents.application.interfaces.object_storage import (
 from app.features.documents.application.interfaces.unit_of_work import (
     DocumentUnitOfWork,
 )
-from app.integretions.s3.constants import ALLOWED_EXTENSIONS
+from app.features.documents.application.constants import ALLOWED_EXTENSIONS
 
 
 class DocumentService:

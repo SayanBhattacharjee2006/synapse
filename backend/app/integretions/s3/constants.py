@@ -1,1 +1,0 @@
-ALLOWED_EXTENSIONS = ["pdf", "doc", "docx", "txt", "md"]

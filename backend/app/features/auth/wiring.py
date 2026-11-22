@@ -5,9 +5,9 @@ from app.core.dependencies import get_db
 from app.features.auth.application.auth_service import AuthService
 from app.features.auth.application.interfaces.password_hasher import PasswordHasher
 from app.features.auth.application.interfaces.token_service import TokenService
-from app.features.auth.application.interfaces.unit_of_work import AuthUnitOfWork
-from app.features.auth.infrastructure.persistence.sqlalchemy_unit_of_work import (
-    SQLAlchemyUnitOfWork,
+from app.features.auth.application.interfaces.user_repository import UserRepository
+from app.features.auth.infrastructure.persistence.sqlalchemy_user_repository import (
+    SQLAlchemyUserRepository,
 )
 from app.features.auth.infrastructure.security.jwt_token_service import (
     JwtTokenService,
@@ -29,20 +29,19 @@ def get_token_service() -> TokenService:
     )
 
 
-def get_auth_uow(
+def get_user_repository(
     session: AsyncSession = Depends(get_db),
-) -> AuthUnitOfWork:
-    return SQLAlchemyUnitOfWork(session)
+) -> UserRepository:
+    return SQLAlchemyUserRepository(session)
 
 
 def get_auth_service(
-    uow: AuthUnitOfWork = Depends(get_auth_uow),
+    user_repo: UserRepository = Depends(get_user_repository),
     password_hasher: PasswordHasher = Depends(get_password_hasher),
     token_service: TokenService = Depends(get_token_service),
 ) -> AuthService:
     return AuthService(
-        uow=uow,
+        user_repo=user_repo,
         password_hasher=password_hasher,
         token_service=token_service,
     )
-

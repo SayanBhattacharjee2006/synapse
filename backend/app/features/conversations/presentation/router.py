@@ -1,8 +1,8 @@
 import uuid
 from fastapi import APIRouter, Depends, HTTPException, status
 
-from app.features.auth.dependencies import get_current_user
-from app.features.auth.model import User
+from app.features.auth.infrastructure.persistence.models import User
+from app.features.auth.presentation.dependencies import get_current_user
 from app.features.conversations.application.conversation_service import (
     ConversationService,
 )

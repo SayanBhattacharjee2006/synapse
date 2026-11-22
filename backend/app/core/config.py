@@ -41,7 +41,6 @@ class Settings(BaseSettings):
     AWS_REGION: str
     AWS_S3_BUCKET_NAME: str
     MAX_FILE_SIZE: int
-    CHUNK_SIZE: int
 
     # RAG
     
