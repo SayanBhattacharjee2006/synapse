@@ -10,7 +10,7 @@ from app.features.conversations.application.enums import SenderEnum
 
 if TYPE_CHECKING:
     from app.features.auth.infrastructure.persistence.models import User
-    from app.features.documents.model import Document
+    from app.features.documents.infrastructure.persistence.models import Document
 
 
 class Conversation(Base):

@@ -7,8 +7,10 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from app.features.conversations.models import Conversation
-    from app.features.documents.model import Document
+    from app.features.conversations.infrastructure.persistence.models import (
+        Conversation,
+    )
+    from app.features.documents.infrastructure.persistence.models import Document
 
 
 class User(Base):
