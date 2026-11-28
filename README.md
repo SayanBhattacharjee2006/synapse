@@ -701,9 +701,8 @@ uv run uvicorn app.main:app   --reload   --host 0.0.0.0   --port 8000
 When running outside Docker, use host-accessible infrastructure values such as:
 
 ```dotenv
-POSTGRES_HOST=localhost
+DATABASE_URL=postgresql+asyncpg://postgres:postgres@localhost:5432/synapse
 QDRANT_URL=http://localhost:6333
-DATABASE_URL=<local-database-url>
 ```
 
 The backend reads its environment configuration from the repository root.

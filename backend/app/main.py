@@ -11,7 +11,7 @@ from app.features.auth.presentation.router import router as auth_router
 from app.ai.rag.vector_store.collections import create_collections
 from app.features.documents.presentation.router import router as documents_router
 from app.core.logging import configure_logging, logger
-from app.integretions.error_monitoring.sentry import configure_sentry
+from app.integrations.error_monitoring.sentry import configure_sentry
 
 origins = [
     'http://localhost:5173',
