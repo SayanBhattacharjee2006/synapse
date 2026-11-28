@@ -5,7 +5,7 @@ from app.ai.llm import llm
 from app.ai.prompts.chat import get_document_aware_web_query_optimizer_prompt
 from app.ai.schema import DocumentAwareWebQuerySchema
 from app.core.logging import logger
-from app.integretions.taviily.tavily import (
+from app.integrations.tavily.tavily import (
     create_search_response,
     search_tavily,
 )

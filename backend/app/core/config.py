@@ -3,12 +3,7 @@ from pydantic import PostgresDsn, model_validator
 
 class Settings(BaseSettings):
   
-    # Database   
-    POSTGRES_USER:str
-    POSTGRES_PASSWORD:str
-    POSTGRES_DB:str
-    POSTGRES_HOST:str
-    POSTGRES_PORT:int
+    # Database
     DATABASE_URL:PostgresDsn
 
     # LangSmith
@@ -22,8 +17,6 @@ class Settings(BaseSettings):
 
     # App
     APP_ENV:str
-    APP_HOST:str
-    APP_PORT:int
     TEST_DATABASE_URL:PostgresDsn
 
     SECRET_KEY:str | None = None

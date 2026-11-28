@@ -1,5 +1,6 @@
 from langgraph.graph import MessagesState
-from app.ai.schema import RouterType, DocumentSummarySchema
+from app.ai.rag.retrieval.schemas import DocumentSummarySchema
+from app.ai.schema import RouterType
 from typing import List
 
 class GraphState(MessagesState):

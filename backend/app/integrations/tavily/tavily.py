@@ -1,11 +1,14 @@
-from app.core.config import settings
 from tavily import AsyncTavilyClient
 
+from app.core.config import settings
+
 tavily_client = AsyncTavilyClient(api_key=settings.TAVILY_API_KEY)
+
 
 async def search_tavily(query: str) -> str:
     response = await tavily_client.search(query, max_results=5, language="en")
     return response
+
 
 def create_search_response(response):
     context = ""

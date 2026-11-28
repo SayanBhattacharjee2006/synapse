@@ -1,8 +1,6 @@
 from enum import Enum
 from pydantic import BaseModel
 
-from app.ai.rag.retrieval.schemas import DocumentSummarySchema
-
 
 class RouterType(str, Enum):
     RAG = "rag"
@@ -25,5 +23,4 @@ __all__ = [
     "RouterType",
     "EvaluatorResponseSchema",
     "DocumentAwareWebQuerySchema",
-    "DocumentSummarySchema",
 ]

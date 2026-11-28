@@ -1,5 +1,6 @@
 from langchain_core.messages import AIMessage, HumanMessage
-from app.ai.schema import DocumentSummarySchema, RouterType
+from app.ai.rag.retrieval.schemas import DocumentSummarySchema
+from app.ai.schema import RouterType
 
 
 def get_system_prompt(
